@@ -1,0 +1,26 @@
+---
+- name: Déploiement de la stack Monitoring
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Création des répertoires de données
+      file:
+        path: "{{ item }}"
+        state: directory
+        owner: "1026"
+        group: "100"
+        mode: '0755'
+      loop:
+        - /volume1/docker/prometheus/config
+        - /volume1/docker/prometheus/data
+        - /volume1/docker/grafana
+
+    - name: Copie de la configuration Prometheus
+      copy:
+        src: ../docker/prometheus/prometheus.yml
+        dest: /volume1/docker/prometheus/config/prometheus.yml
+        owner: "1026"
+        group: "100"
+
+    - name: Lancement de la stack via Docker Compose
+      command: docker compose -f ../docker/docker-compose.yml up -d --remove-orphans
