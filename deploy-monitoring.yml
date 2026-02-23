@@ -18,6 +18,7 @@
         - "grafana"
 
     - name: "Copie de la configuration"
+      # On prend le fichier à la racine du workspace
       copy:
         src: "prometheus.yml"
         dest: "/volume1/docker/prometheus/config/prometheus.yml"
@@ -26,6 +27,7 @@
         mode: '0644'
 
     - name: "Lancement Docker"
-      shell: "docker compose up -d --remove-orphans --wait"
+      # On force Docker à regarder dans le dossier de travail actuel du Runner
+      shell: "docker compose -f {{ ansible_env.PWD }}/docker-compose.yml up -d --remove-orphans --wait"
       environment:
         DOCKER_HOST: "unix:///var/run/docker.sock"
