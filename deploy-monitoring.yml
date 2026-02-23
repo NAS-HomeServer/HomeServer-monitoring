@@ -1,42 +1,38 @@
 ---
-- name: Déploiement de la stack Monitoring - NAS-HomeServer
+- name: "IaC - Deploiement Stack Monitoring NAS HomeServer"
   hosts: localhost
   connection: local
+
+  vars:
+    base_path: "/volume1/docker"
+    user_id: 1026
+    group_id: 100
+
   tasks:
-    - name: Création des répertoires de données
-      # Utilise sudo pour garantir la création sur /volume1/docker
-      become: true 
-      file:
-        path: "{{ item }}"
-        state: directory
-        owner: "1026"
-        group: "100"
-        mode: '0755'
-      loop:
-        - /volume1/docker/prometheus/config
-        - /volume1/docker/prometheus/data
-        - /volume1/docker/grafana
-
-    - name: Copie de la configuration Prometheus
-      # On cherche le fichier à la racine du dépôt désormais
-      copy:
-        src: prometheus.yml 
-        dest: /volume1/docker/prometheus/config/prometheus.yml
-        owner: "1026"
-        group: "100"
-        mode: '0644'
-
-    - name: Vérification des droits sur le dossier Grafana
-      # Étape cruciale pour éviter que Grafana ne puisse pas écrire sa base SQL
+    - name: "Creation des repertoires de config"
       become: true
       file:
-        path: /volume1/docker/grafana
+        path: "{{ base_path }}/{{ item }}"
         state: directory
-        owner: "1026"
-        group: "100"
-        recurse: yes
+        owner: "{{ user_id }}"
+        group: "{{ group_id }}"
+        mode: '0775'
+      loop:
+        - "prometheus/config"
+        - "prometheus/data"
+        - "grafana"
 
-    - name: Lancement de la stack via Docker Compose
-      # On utilise le fichier à la racine
-      # Le flag --wait vérifie que Prometheus et Grafana démarrent bien
-      command: docker compose -f docker-compose.yml up -d --remove-orphans --wait
+    - name: "Copie de la configuration Prometheus"
+      copy:
+        src: prometheus.yml 
+        dest: "{{ base_path }}/prometheus/config/prometheus.yml"
+        owner: "{{ user_id }}"
+        group: "{{ group_id }}"
+        mode: '0644'
+
+    - name: "Lancement de la stack via Docker-Compose"
+      shell: "docker compose -f docker-compose.yml up -d --remove-orphans --wait"
+      args:
+        chdir: "{{ playbook_dir }}"
+      environment:
+        DOCKER_HOST: "unix:///var/run/docker.sock"
