@@ -8,16 +8,19 @@ x-common-env: &common-env
 
 services:
   prometheus:
-    image: prom/prometheus:v2.45.0 # Version LTS stable pour ton CPU Atom
+    image: prom/prometheus:latest
     container_name: prometheus
-    restart: unless-stopped
-    user: "1026:100"
+    user: "1026:100" # Les droits qu'on a fixés tout à l'heure
+    ports:
+      - "9090:9090"
     volumes:
-      - /volume1/docker/prometheus/config:/etc/prometheus
+      # LA LIGNE CRUCIALE : NAS -> CONTENEUR
+      - /volume1/docker/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
+      # Le dossier pour stocker la base de données (l'historique)
       - /volume1/docker/prometheus/data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
-      - '--storage.tsdb.retention.time=7d' # Préserve l'espace disque de ton NAS
+      - '--storage.tsdb.path=/prometheus'
 
   grafana:
     image: grafana/grafana-oss:latest
