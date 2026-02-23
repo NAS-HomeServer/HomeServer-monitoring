@@ -17,16 +17,15 @@
         - "prometheus/data"
         - "grafana"
 
-    - name: "Copie de la configuration"
-      # On prend le fichier à la racine du workspace
-      copy:
-        src: "prometheus.yml"
-        dest: "/volume1/docker/prometheus/config/prometheus.yml"
-        owner: "1026"
-        group: "100"
-        mode: '0644'
+    - name: "Transfert sécurisé de la config vers le vrai NAS"
+      # On lit le fichier dans le Runner et on l'injecte dans le vrai NAS via le socket Docker
+      shell: |
+        cat prometheus.yml | docker run -i --rm -v /volume1/docker:/nas_docker alpine sh -c "mkdir -p /nas_docker/prometheus/config && cat > /nas_docker/prometheus/config/prometheus.yml && chown 1026:100 /nas_docker/prometheus/config/prometheus.yml"
+      environment:
+        DOCKER_HOST: "unix:///var/run/docker.sock"
 
     - name: "Lancement Docker"
+      # On lance enfin la stack, en pointant vers le fichier récupéré à la racine par le Runner
       shell: "docker compose -f {{ ansible_env.PWD }}/docker-compose.yml up -d --remove-orphans"
       environment:
         DOCKER_HOST: "unix:///var/run/docker.sock"
