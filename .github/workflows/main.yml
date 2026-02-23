@@ -19,8 +19,8 @@ jobs:
           cd ./deploy_workspace_monitoring
           curl -L -u "axelginepro:${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/cyberlab-monitoring/tarball/main -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
+          # Si l'extraction échoue, on affiche le contenu du fichier pour lire l'erreur
+          tar -xzf repo.tar.gz --strip-components=1 || (cat repo.tar.gz && exit 1)
 
       - name: Execution Ansible
         run: |
