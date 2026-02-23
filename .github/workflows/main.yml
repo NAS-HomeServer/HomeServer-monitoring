@@ -1,0 +1,28 @@
+name: Deploiement Automatique Monitoring
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    runs-on: self-hosted
+    steps:
+      - name: Preparation du repertoire
+        run: |
+          mkdir -p ./deploy_workspace_monitoring
+          rm -rf ./deploy_workspace_monitoring/*
+
+      - name: Recuperation du code
+        run: |
+          cd ./deploy_workspace_monitoring
+          curl -L -u "axelginepro:${{ secrets.MY_GITHUB_TOKEN }}" \
+            https://api.github.com/repos/axelginepro/cyberlab-monitoring/tarball/main -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
+
+      - name: Execution Ansible
+        run: |
+          cd ./deploy_workspace_monitoring/ansible
+          ansible-playbook -i hosts.ini deploy-monitoring.yml
