@@ -1,38 +1,31 @@
 ---
-- name: "IaC - Deploiement Stack Monitoring NAS HomeServer"
+- name: "IaC - Deploiement Stack Monitoring"
   hosts: localhost
   connection: local
 
-  vars:
-    base_path: "/volume1/docker"
-    user_id: 1026
-    group_id: 100
-
   tasks:
-    - name: "Creation des repertoires de config"
+    - name: "Creation des repertoires"
       become: true
       file:
-        path: "{{ base_path }}/{{ item }}"
+        path: "/volume1/docker/{{ item }}"
         state: directory
-        owner: "{{ user_id }}"
-        group: "{{ group_id }}"
+        owner: "1026"
+        group: "100"
         mode: '0775'
       loop:
         - "prometheus/config"
         - "prometheus/data"
         - "grafana"
 
-    - name: "Copie de la configuration Prometheus"
+    - name: "Copie de la configuration"
       copy:
-        src: prometheus.yml 
-        dest: "{{ base_path }}/prometheus/config/prometheus.yml"
-        owner: "{{ user_id }}"
-        group: "{{ group_id }}"
+        src: "prometheus.yml"
+        dest: "/volume1/docker/prometheus/config/prometheus.yml"
+        owner: "1026"
+        group: "100"
         mode: '0644'
 
-    - name: "Lancement de la stack via Docker-Compose"
+    - name: "Lancement Docker"
       shell: "docker compose up -d --remove-orphans --wait"
-      args:
-        chdir: "{{ ansible_env.PWD }}/deploy_workspace_monitoring"
       environment:
         DOCKER_HOST: "unix:///var/run/docker.sock"
