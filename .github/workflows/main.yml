@@ -16,11 +16,14 @@ jobs:
 
       - name: Recuperation du code
         run: |
+          mkdir -p ./deploy_workspace_monitoring
           cd ./deploy_workspace_monitoring
+          # Téléchargement
           curl -L -u "axelginepro:${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main -o repo.tar.gz
-          # Si l'extraction échoue, on affiche le contenu du fichier pour lire l'erreur
-          tar -xzf repo.tar.gz --strip-components=1 || (cat repo.tar.gz && exit 1)
+          # Extraction SANS doublon de dossier
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
       - name: Execution Ansible
         run: |
