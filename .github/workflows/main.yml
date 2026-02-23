@@ -24,5 +24,8 @@ jobs:
 
       - name: Execution Ansible
         run: |
-          cd ./deploy_workspace_monitoring/ansible
-          ansible-playbook -i hosts.ini deploy-monitoring.yml
+          # On se place dans la racine du workspace comme pour ton autre repo
+          cd ./deploy_workspace_monitoring
+          # On lance le playbook. 
+          # Attention : vérifie que deploy-monitoring.yml est bien à la RACINE du dépôt
+          ansible-playbook -i ansible/hosts.ini ansible/deploy-monitoring.yml
