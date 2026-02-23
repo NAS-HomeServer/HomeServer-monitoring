@@ -4,7 +4,7 @@
   connection: local
   tasks:
     - name: Création des répertoires de données
-      # Utilise sudo pour garantir la création si le Runner n'a pas les droits sur /volume1/docker
+      # Utilise sudo pour garantir la création sur /volume1/docker
       become: true 
       file:
         path: "{{ item }}"
@@ -18,14 +18,25 @@
         - /volume1/docker/grafana
 
     - name: Copie de la configuration Prometheus
-      # Cette étape est cruciale : Prometheus ne démarre pas sans ce fichier
+      # On cherche le fichier à la racine du dépôt désormais
       copy:
-        src: ../docker/prometheus/prometheus.yml
+        src: prometheus.yml 
         dest: /volume1/docker/prometheus/config/prometheus.yml
         owner: "1026"
         group: "100"
         mode: '0644'
 
+    - name: Vérification des droits sur le dossier Grafana
+      # Étape cruciale pour éviter que Grafana ne puisse pas écrire sa base SQL
+      become: true
+      file:
+        path: /volume1/docker/grafana
+        state: directory
+        owner: "1026"
+        group: "100"
+        recurse: yes
+
     - name: Lancement de la stack via Docker Compose
-      # Le flag --wait permet de s'assurer que les conteneurs sont sains avant de finir la tâche
-      command: docker compose -f ../docker/docker-compose.yml up -d --remove-orphans --wait
+      # On utilise le fichier à la racine
+      # Le flag --wait vérifie que Prometheus et Grafana démarrent bien
+      command: docker compose -f docker-compose.yml up -d --remove-orphans --wait
