@@ -2,6 +2,14 @@ global:
   scrape_interval: 15s
 
 scrape_configs:
+  # 1. Surveillance du matériel du NAS
   - job_name: 'synology-nas'
     static_configs:
-      - targets: ['192.168.1.48:9100']
+      # On appelle directement le conteneur par son nom
+      - targets: ['node-exporter:9100'] 
+
+  # 2. Surveillance des conteneurs Docker via cAdvisor
+  - job_name: 'docker-containers'
+    static_configs:
+      # On appelle directement le conteneur cAdvisor
+      - targets: ['cadvisor:8080']
