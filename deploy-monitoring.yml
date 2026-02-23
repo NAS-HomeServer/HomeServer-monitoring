@@ -31,8 +31,6 @@
         mode: '0644'
 
     - name: "Lancement de la stack via Docker-Compose"
-      shell: "docker compose -f docker-compose.yml up -d --remove-orphans --wait"
-      args:
-        chdir: "./" 
+      shell: "docker compose -f {{ ansible_env.PWD }}/deploy_workspace_monitoring/docker-compose.yml up -d --remove-orphans --wait"
       environment:
         DOCKER_HOST: "unix:///var/run/docker.sock"
