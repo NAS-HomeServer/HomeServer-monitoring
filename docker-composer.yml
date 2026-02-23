@@ -1,0 +1,38 @@
+services:
+  prometheus:
+    image: prom/prometheus:v2.45.0 # Version LTS stable pour ton CPU Atom
+    container_name: prometheus
+    restart: unless-stopped
+    user: "1026:100"
+    volumes:
+      - /volume1/docker/prometheus/config:/etc/prometheus
+      - /volume1/docker/prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.retention.time=7d' # Limite l'usage disque sur ton NAS
+
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    ports:
+      - 3001:3000
+    environment:
+      - PUID=1026
+      - PGID=100
+    volumes:
+      - /volume1/docker/grafana:/var/lib/grafana
+
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    network_mode: host # Indispensable pour lire les métriques du NAS hôte
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.ignored-mount-points=^/(sys|proc|dev|host|etc)($|/)'
