@@ -1,9 +1,11 @@
 ---
-- name: Déploiement de la stack Monitoring
+- name: Déploiement de la stack Monitoring - NAS-HomeServer
   hosts: localhost
   connection: local
   tasks:
     - name: Création des répertoires de données
+      # Utilise sudo pour garantir la création si le Runner n'a pas les droits sur /volume1/docker
+      become: true 
       file:
         path: "{{ item }}"
         state: directory
@@ -16,11 +18,14 @@
         - /volume1/docker/grafana
 
     - name: Copie de la configuration Prometheus
+      # Cette étape est cruciale : Prometheus ne démarre pas sans ce fichier
       copy:
         src: ../docker/prometheus/prometheus.yml
         dest: /volume1/docker/prometheus/config/prometheus.yml
         owner: "1026"
         group: "100"
+        mode: '0644'
 
     - name: Lancement de la stack via Docker Compose
-      command: docker compose -f ../docker/docker-compose.yml up -d --remove-orphans
+      # Le flag --wait permet de s'assurer que les conteneurs sont sains avant de finir la tâche
+      command: docker compose -f ../docker/docker-compose.yml up -d --remove-orphans --wait
