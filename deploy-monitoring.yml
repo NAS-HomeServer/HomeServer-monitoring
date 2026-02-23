@@ -27,7 +27,6 @@
         mode: '0644'
 
     - name: "Lancement Docker"
-      # On force Docker à regarder dans le dossier de travail actuel du Runner
-      shell: "docker compose -f {{ ansible_env.PWD }}/docker-compose.yml up -d --remove-orphans --wait"
+      shell: "docker compose -f {{ ansible_env.PWD }}/docker-compose.yml up -d --remove-orphans"
       environment:
         DOCKER_HOST: "unix:///var/run/docker.sock"
