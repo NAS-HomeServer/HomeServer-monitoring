@@ -11,16 +11,15 @@ jobs:
     steps:
       - name: Nettoyage et Recuperation
         run: |
-          # On vide tout le contenu actuel du dossier de travail
+          # On repart de zéro dans le dossier de travail
           rm -rf ./*
-          # On télécharge l'archive
           curl -L -u "axelginepro:${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main -o repo.tar.gz
-          # On extrait les fichiers directement ICI sans créer de sous-dossier parent
+          # --strip-components=1 est la clé : il extrait les fichiers SANS le dossier parent
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
       - name: Execution Ansible
         run: |
-          # On lance Ansible là où on est, car tout est à la racine
+          # On lance Ansible directement, car hosts.ini et le playbook sont à la racine
           ansible-playbook -i hosts.ini deploy-monitoring.yml
