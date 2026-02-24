@@ -48,7 +48,4 @@ services:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /volume1/@docker:/var/lib/docker:ro # <-- La correction d'architecture Synology
-      - /dev/disk/:/dev/disk:ro
-    devices:
-      - /dev/kmsg
+      - /volume1/@docker:/var/lib/docker:ro
