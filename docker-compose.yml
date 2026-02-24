@@ -1,22 +1,14 @@
 version: '3.8'
 
-# Définition des variables communes (Don't Repeat Yourself)
-x-common-env: &common-env
-  PUID: 1026
-  PGID: 100
-  TZ: Europe/Paris
-
 services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
-    user: "1026:100" # Les droits qu'on a fixés tout à l'heure
+    user: "1026:100"
     ports:
       - "9090:9090"
     volumes:
-      # LA LIGNE CRUCIALE : NAS -> CONTENEUR
       - /volume1/docker/prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
-      # Le dossier pour stocker la base de données (l'historique)
       - /volume1/docker/prometheus/data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
@@ -26,16 +18,17 @@ services:
     image: grafana/grafana-oss:latest
     container_name: grafana
     restart: unless-stopped
+    user: "1026:100" # <-- Le retour de la directive vitale pour tes permissions
     ports:
-      - 3001:3000 # Accès via http://IP_DU_NAS:3001
+      - "3001:3000"
     environment:
-      <<: *common-env
+      - TZ=Europe/Paris
     volumes:
       - /volume1/docker/grafana:/var/lib/grafana
 
   node-exporter:
     image: prom/node-exporter:latest
-    container_name: node-exporter # C'est ce nom que Prometheus va utiliser !
+    container_name: node-exporter
     restart: unless-stopped
     volumes:
       - /proc:/host/proc:ro
@@ -49,13 +42,13 @@ services:
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:latest
-    container_name: cadvisor # C'est ce nom que Prometheus va utiliser !
+    container_name: cadvisor
     restart: unless-stopped
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /var/lib/docker/:/var/lib/docker:ro
+      - /volume1/@docker:/var/lib/docker:ro # <-- La correction d'architecture Synology
       - /dev/disk/:/dev/disk:ro
     devices:
       - /dev/kmsg
