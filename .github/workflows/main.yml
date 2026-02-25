@@ -9,17 +9,39 @@ jobs:
   deploy:
     runs-on: self-hosted
     steps:
-      - name: Nettoyage et Recuperation
+      - name: Nettoyage du repertoire sur Volume1
         run: |
-          # On repart de zéro dans le dossier de travail
-          rm -rf ./*
-          curl -L -u "axelginepro:${{ secrets.MY_GITHUB_TOKEN }}" \
+          # On utilise un dossier dédié pour ne pas mélanger les deux projets
+          mkdir -p /volume1/docker/monitoring_workspace
+          rm -rf /volume1/docker/monitoring_workspace/*
+
+      - name: Recuperation du code (Fallback Curl)
+        run: |
+          cd /volume1/docker/monitoring_workspace
+          curl -f -L -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main -o repo.tar.gz
-          # --strip-components=1 est la clé : il extrait les fichiers SANS le dossier parent
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Execution Ansible
+      - name: Execution Ansible via Docker (Contournement Inception + DooD)
         run: |
-          # On lance Ansible directement, car hosts.ini et le playbook sont à la racine
-          ansible-playbook -i hosts.ini deploy-monitoring.yml
+          cd /volume1/docker/monitoring_workspace
+          
+          # 1. On crée le Dockerfile jetable avec Ansible + Docker
+          cat << 'EOF' > Dockerfile
+          FROM alpine/ansible:latest
+          RUN apk add --no-cache docker docker-compose
+          COPY . /workspace
+          WORKDIR /workspace
+          EOF
+          
+          # 2. On compile l'image temporaire
+          docker build -t ansible-monitoring-tmp .
+          
+          # 3. On lance le déploiement en connectant le Docker du NAS
+          docker run --rm \
+            -e ANSIBLE_HOST_KEY_CHECKING=False \
+            -v ~/.ssh:/root/.ssh:ro \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ansible-monitoring-tmp \
+            ansible-playbook -i hosts.ini deploy-monitoring.yml
