@@ -11,7 +11,6 @@ jobs:
     steps:
       - name: Nettoyage du repertoire sur Volume1
         run: |
-          # On utilise un dossier dédié pour ne pas mélanger les deux projets
           mkdir -p /volume1/docker/monitoring_workspace
           rm -rf /volume1/docker/monitoring_workspace/*
 
@@ -23,7 +22,7 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Execution Ansible via Docker (Contournement Inception + DooD)
+      - name: Execution Ansible via Docker (Nettoyage Force + DooD)
         run: |
           cd /volume1/docker/monitoring_workspace
           
@@ -38,12 +37,16 @@ jobs:
           # 2. On compile l'image
           docker build -t ansible-monitoring-tmp .
           
-          # 3. On lance Ansible avec l'instruction de nettoyage
-          # L'option --remove-orphans dans ton playbook fera le reste
+          # 3. LE COUP DE BALAI : On arrête tout ce qui porte le nom de ta stack avant
+          # On ignore les erreurs si rien n'existe (|| true)
+          docker stop node-exporter cadvisor prometheus grafana || true
+          docker rm node-exporter cadvisor prometheus grafana || true
+          
+          # 4. On lance Ansible avec la compatibilité API 1.41
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e DOCKER_API_VERSION=1.41 \
             -v ~/.ssh:/root/.ssh:ro \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ansible-monitoring-tmp \
-            sh -c "docker compose down && ansible-playbook -i hosts.ini deploy-monitoring.yml"
+            ansible-playbook -i hosts.ini deploy-monitoring.yml
