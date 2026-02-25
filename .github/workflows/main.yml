@@ -27,7 +27,7 @@ jobs:
         run: |
           cd /volume1/docker/monitoring_workspace
           
-          # 1. On crée le Dockerfile jetable avec Ansible + Docker
+          # 1. On crée le Dockerfile jetable
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
@@ -35,12 +35,13 @@ jobs:
           WORKDIR /workspace
           EOF
           
-          # 2. On compile l'image temporaire
+          # 2. On compile l'image
           docker build -t ansible-monitoring-tmp .
           
-          # 3. On lance le déploiement en connectant le Docker du NAS
+          # 3. ON AJOUTE LA VARIABLE DE VERSION ICI (DOCKER_API_VERSION)
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
+            -e DOCKER_API_VERSION=1.41 \
             -v ~/.ssh:/root/.ssh:ro \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ansible-monitoring-tmp \
