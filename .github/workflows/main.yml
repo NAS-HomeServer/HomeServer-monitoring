@@ -30,8 +30,8 @@ jobs:
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
-          COPY . /workspace
-          WORKDIR /workspace
+          COPY . /monitoring-homeserver
+          WORKDIR /monitoring-homeserver
           EOF
           
           # 2. On compile l'image
