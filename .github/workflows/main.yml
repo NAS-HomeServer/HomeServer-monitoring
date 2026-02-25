@@ -38,11 +38,12 @@ jobs:
           # 2. On compile l'image
           docker build -t ansible-monitoring-tmp .
           
-          # 3. ON AJOUTE LA VARIABLE DE VERSION ICI (DOCKER_API_VERSION)
+          # 3. On lance Ansible avec l'instruction de nettoyage
+          # L'option --remove-orphans dans ton playbook fera le reste
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e DOCKER_API_VERSION=1.41 \
             -v ~/.ssh:/root/.ssh:ro \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ansible-monitoring-tmp \
-            ansible-playbook -i hosts.ini deploy-monitoring.yml
+            sh -c "docker compose down && ansible-playbook -i hosts.ini deploy-monitoring.yml"
