@@ -24,14 +24,25 @@ jobs:
 
       - name: Execution Ansible via Docker
         run: |
-          cd /volume1/docker/monitoring_workspace
+          cd ${{ github.workspace }}
           
+          # 1. Dockerfile minimaliste
+          cat << 'EOF' > Dockerfile
+          FROM alpine/ansible:latest
+          RUN apk add --no-cache docker docker-compose
+          EOF
+          
+          # 2. Build de l'image
           docker build -t ansible-monitoring-tmp .
           
+          # 3. Exécution avec montage précis
+          # On s'assure que /monitoring-homeserver dans le conteneur 
+          # pointe vers le dossier où curl a téléchargé le code.
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e DOCKER_API_VERSION=1.41 \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /volume1/docker/monitoring_workspace:/monitoring-homeserver \
             -v /volume1/docker:/volume1/docker \
             ansible-monitoring-tmp \
-            ansible-playbook -i hosts.ini deploy-monitoring.yml
+            ansible-playbook -i /monitoring-homeserver/hosts.ini /monitoring-homeserver/deploy-monitoring.yml
