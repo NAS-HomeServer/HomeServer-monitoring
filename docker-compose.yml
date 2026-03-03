@@ -46,7 +46,7 @@ services:
     container_name: zabbix-web
     restart: unless-stopped
     ports:
-      - "8080:8080" # Accès via http://IP_DU_NAS:8080
+      - "8085:8080" # Accès via http://IP_DU_NAS:8080
     environment:
       - DB_SERVER_HOST=zabbix-db
       - MYSQL_DATABASE=zabbix
