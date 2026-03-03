@@ -22,31 +22,16 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Execution Ansible via Docker (Migration Zabbix + DooD)
+      - name: Execution Ansible via Docker
         run: |
           cd /volume1/docker/monitoring_workspace
           
-          # 1. On crée le Dockerfile jetable
-          cat << 'EOF' > Dockerfile
-          FROM alpine/ansible:latest
-          RUN apk add --no-cache docker docker-compose
-          COPY . /monitoring-homeserver
-          WORKDIR /monitoring-homeserver
-          EOF
-          
-          # 2. On compile l'image
           docker build -t ansible-monitoring-tmp .
           
-          # 3. LE COUP DE BALAI : On arrête l'ancienne stack (Prometheus) ET la nouvelle (Zabbix) pour un clean deploy
-          # Note : On ajoute les nouveaux noms de conteneurs Zabbix
-          docker stop node-exporter cadvisor prometheus zabbix-server zabbix-web zabbix-db zabbix-agent grafana || true
-          docker rm node-exporter cadvisor prometheus zabbix-server zabbix-web zabbix-db zabbix-agent grafana || true
-          
-          # 4. On lance Ansible avec la compatibilité API 1.41
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e DOCKER_API_VERSION=1.41 \
-            -v ~/.ssh:/root/.ssh:ro \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /volume1/docker:/volume1/docker \
             ansible-monitoring-tmp \
             ansible-playbook -i hosts.ini deploy-monitoring.yml
