@@ -87,7 +87,7 @@ services:
     network_mode: host
     environment:
       - ZBX_HOSTNAME=Synology-NAS
-      - ZBX_SERVER_HOST=127.0.0.1
+      - ZBX_SERVER_HOST=0.0.0.0/0
     deploy:
       resources:
         limits:
