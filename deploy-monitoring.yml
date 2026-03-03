@@ -1,31 +1,25 @@
 ---
-- name: "IaC - Deploiement Stack Monitoring"
+- name: "IaC - Deploiement Stack Monitoring Zabbix"
   hosts: localhost
   connection: local
 
   tasks:
-    - name: "Creation des repertoires"
-      become: true
+    - name: "Creation des repertoires pour Zabbix"
       file:
-        path: "/volume1/docker/{{ item }}"
+        path: "/volume1/docker/zabbix/{{ item }}"
         state: directory
-        owner: "1026"
-        group: "100"
-        mode: '0775'
-      loop:
-        - "prometheus/config"
-        - "prometheus/data"
-        - "grafana"
+        mode: '0755'
+      with_items:
+        - 'db_data'
+        - 'alertscripts'
 
-    - name: "Transfert sécurisé de la config vers le vrai NAS"
-      # On lit le fichier dans le Runner et on l'injecte dans le vrai NAS via le socket Docker
-      shell: |
-        cat prometheus.yml | docker run -i --rm -v /volume1/docker:/nas_docker alpine sh -c "mkdir -p /nas_docker/prometheus/config && cat > /nas_docker/prometheus/config/prometheus.yml && chown 1026:100 /nas_docker/prometheus/config/prometheus.yml"
-      environment:
-        DOCKER_HOST: "unix:///var/run/docker.sock"
+    - name: "Creation du repertoire pour Grafana"
+      file:
+        path: "/volume1/docker/grafana"
+        state: directory
+        mode: '0755'
 
-    - name: "Lancement Docker"
-      # On lance enfin la stack, en pointant vers le fichier récupéré à la racine par le Runner
-      shell: "docker compose -f {{ ansible_env.PWD }}/docker-compose.yml up -d --remove-orphans"
-      environment:
-        DOCKER_HOST: "unix:///var/run/docker.sock"
+    - name: "Lancement Docker via Docker Compose"
+      shell: "docker-compose -f /volume1/docker/monitoring_workspace/docker-compose.yml up -d --remove-orphans"
+      args:
+        chdir: "/volume1/docker/monitoring_workspace"
