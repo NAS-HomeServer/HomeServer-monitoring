@@ -26,6 +26,12 @@ jobs:
         run: |
           cd /volume1/docker/monitoring_workspace
           
+          # --- DEBOGAGE ---
+          echo "==== CONTENU DU DOSSIER APRES TELECHARGEMENT GITHUB ===="
+          ls -la
+          echo "========================================================"
+          # ----------------
+          
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
