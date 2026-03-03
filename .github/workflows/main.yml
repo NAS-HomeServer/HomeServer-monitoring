@@ -22,28 +22,22 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Execution Ansible via Docker (Méthode Workspace Injecté)
+      - name: Execution Ansible via Docker
         run: |
-          # On se place là où le code a été extrait sur le NAS
-          cd /volume1/docker/monitoring_workspace
+          cd ${{ github.workspace }}
           
-          # 1. On crée le Dockerfile qui INJECTE le code (COPY)
+          # 1. Image pure, sans COPY
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
-          # C'est cette ligne qui résout ton erreur "could not be found"
-          COPY . /monitoring-homeserver
-          WORKDIR /monitoring-homeserver
           EOF
           
-          # 2. Build de l'image (inclut tes fichiers .yml et .ini)
-          docker build -t ansible-monitoring-tmp .
+          docker build -t ansible-runner-tmp .
           
-          # 3. Exécution (DooD)
-          # On monte /volume1/docker pour que Ansible puisse créer les dossiers réels sur le NAS
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /volume1/docker:/volume1/docker \
-            ansible-monitoring-tmp \
+            -w /volume1/docker/monitoring_workspace \
+            ansible-runner-tmp \
             ansible-playbook -i hosts.ini deploy-monitoring.yml
