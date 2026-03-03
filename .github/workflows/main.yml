@@ -24,9 +24,8 @@ jobs:
 
       - name: Execution Ansible via Docker
         run: |
-          cd ${{ github.workspace }}
+          cd /volume1/docker/monitoring_workspace
           
-          # 1. Image pure, sans COPY
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
@@ -37,7 +36,8 @@ jobs:
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /volume1/docker/monitoring_workspace:/app \
             -v /volume1/docker:/volume1/docker \
-            -w /volume1/docker/monitoring_workspace \
+            -w /app \
             ansible-runner-tmp \
             ansible-playbook -i hosts.ini deploy-monitoring.yml
