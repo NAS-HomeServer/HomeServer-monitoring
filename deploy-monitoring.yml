@@ -20,6 +20,6 @@
         mode: '0755'
 
     - name: "Lancement Docker via Docker Compose"
-      shell: "docker-compose -f /volume1/docker/monitoring_workspace/docker-compose.yml up -d --remove-orphans"
+      shell: "docker-compose -f /app/docker-compose.yml up -d --remove-orphans"
       args:
-        chdir: "/volume1/docker/monitoring_workspace"
+        chdir: "/app"
