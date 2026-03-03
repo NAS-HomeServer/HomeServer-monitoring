@@ -1,4 +1,4 @@
-name: Deploiement Automatique Monitoring
+name: Deploiement Automatique Monitoring (Zabbix Stack)
 on:
   push:
     branches:
@@ -22,7 +22,7 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Execution Ansible via Docker (Nettoyage Force + DooD)
+      - name: Execution Ansible via Docker (Migration Zabbix + DooD)
         run: |
           cd /volume1/docker/monitoring_workspace
           
@@ -37,10 +37,10 @@ jobs:
           # 2. On compile l'image
           docker build -t ansible-monitoring-tmp .
           
-          # 3. LE COUP DE BALAI : On arrête tout ce qui porte le nom de ta stack avant
-          # On ignore les erreurs si rien n'existe (|| true)
-          docker stop node-exporter cadvisor prometheus grafana || true
-          docker rm node-exporter cadvisor prometheus grafana || true
+          # 3. LE COUP DE BALAI : On arrête l'ancienne stack (Prometheus) ET la nouvelle (Zabbix) pour un clean deploy
+          # Note : On ajoute les nouveaux noms de conteneurs Zabbix
+          docker stop node-exporter cadvisor prometheus zabbix-server zabbix-web zabbix-db zabbix-agent grafana || true
+          docker rm node-exporter cadvisor prometheus zabbix-server zabbix-web zabbix-db zabbix-agent grafana || true
           
           # 4. On lance Ansible avec la compatibilité API 1.41
           docker run --rm \
