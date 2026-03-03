@@ -87,7 +87,7 @@ services:
     network_mode: host
     environment:
       - ZBX_HOSTNAME=Synology-NAS
-      - ZBX_SERVER_HOST=zabbix-server,127.0.0.1,172.17.0.1
+      - ZBX_SERVER_HOST=172.17.0.1,127.0.0.1,zabbix-server
       - ZBX_SERVER_ACTIVE=zabbix-server
     deploy:
       resources:
