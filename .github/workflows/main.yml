@@ -26,24 +26,21 @@ jobs:
         run: |
           cd /volume1/docker/monitoring_workspace
           
-          # --- DEBOGAGE ---
-          echo "==== CONTENU DU DOSSIER APRES TELECHARGEMENT GITHUB ===="
-          ls -la
-          echo "========================================================"
-          # ----------------
-          
+          # 1. On remet la méthode COPY qui incluait tes fichiers avec succès
           cat << 'EOF' > Dockerfile
           FROM alpine/ansible:latest
           RUN apk add --no-cache docker docker-compose
+          COPY . /app
+          WORKDIR /app
           EOF
           
+          # 2. On compile (tes fichiers yml et ini sont maintenant DANS l'image)
           docker build -t ansible-runner-tmp .
           
+          # 3. On lance (on garde le montage pour que Ansible puisse créer les dossiers Zabbix)
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /volume1/docker/monitoring_workspace:/app \
             -v /volume1/docker:/volume1/docker \
-            -w /app \
             ansible-runner-tmp \
             ansible-playbook -i hosts.ini deploy-monitoring.yml
