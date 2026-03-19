@@ -19,6 +19,12 @@
         state: directory
         mode: '0755'
 
+    - name: "Nettoyage des anciens conteneurs (si existants)"
+      shell: "docker-compose -p monitoring-homeserver -f /app/docker-compose.yml down"
+      args:
+        chdir: "/app"
+      failed_when: false # Très important : ne bloque pas si rien n'est à supprimer
+
     - name: "Lancement Docker via Docker Compose"
       shell: "docker-compose -p monitoring-homeserver -f /app/docker-compose.yml up -d --remove-orphans"
       args:
