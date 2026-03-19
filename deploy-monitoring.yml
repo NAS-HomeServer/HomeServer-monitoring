@@ -22,4 +22,4 @@
     - name: "Lancement Docker via Docker Compose"
       shell: "docker-compose -f /app/docker-compose.yml up -d --remove-orphans"
       args:
-        chdir: "/app"
+        chdir: "/monitoring-homeserver"
