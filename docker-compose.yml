@@ -76,6 +76,7 @@ services:
   prometheus:
     image: prom/prometheus:latest
     container_name: prometheus
+    user: "root"  # Force l'exécution en root pour régler les problèmes de droits sur le NAS
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -85,6 +86,7 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.no-lockfile' # Crucial pour éviter les crashs sur Synology
       - '--web.console.libraries=/usr/share/prometheus/console_libraries'
       - '--web.console.templates=/usr/share/prometheus/consoles'
     deploy:
