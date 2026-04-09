@@ -1,4 +1,4 @@
-name: Deploiement Automatique Monitoring (Zabbix Stack)
+name: Deploiement Automatique Monitoring (Zabbix Stack) 
 on:
   push:
     branches:
