@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Base de données : Stockage de la configuration et des données de monitoring
+  # --- BLOC ZABBIX ---
   zabbix-db:
     image: mariadb:10.6
     container_name: zabbix-db
@@ -19,7 +19,6 @@ services:
         limits:
           memory: 512M
 
-  # Serveur Zabbix : Le cerveau qui analyse les données et gère les alertes
   zabbix-server:
     image: zabbix/zabbix-server-mysql:latest
     container_name: zabbix-server
@@ -40,13 +39,12 @@ services:
         limits:
           memory: 256M
 
-  # Interface Web : Pour la configuration et la visualisation (Bloc 2 du RNCP6)
   zabbix-web:
     image: zabbix/zabbix-web-apache-mysql:latest
     container_name: zabbix-web
     restart: unless-stopped
     ports:
-      - "8085:8080" # Accès via http://IP_DU_NAS:8080
+      - "8085:8080"
     environment:
       - DB_SERVER_HOST=zabbix-db
       - MYSQL_DATABASE=zabbix
@@ -60,25 +58,6 @@ services:
         limits:
           memory: 256M
 
-  # Grafana : Pour tes dashboards avancés (utilisant tes compétences UI/UX [cite: 20, 29])
-  grafana:
-    image: grafana/grafana-oss:latest
-    container_name: grafana
-    restart: unless-stopped
-    user: "1026:100" # Ton ID utilisateur Synology pour les droits d'écriture
-    ports:
-      - "3001:3000"
-    environment:
-      - TZ=Europe/Paris
-      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app # Installation auto du plugin Zabbix
-    volumes:
-      - /volume1/docker/grafana:/var/lib/grafana
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  # Agent Zabbix : Pour surveiller les performances locales de ton NAS
   zabbix-agent:
     image: zabbix/zabbix-agent:latest
     container_name: zabbix-agent
@@ -87,9 +66,61 @@ services:
     network_mode: host
     environment:
       - ZBX_HOSTNAME=Synology-NAS
-      - ZBX_SERVER_HOST=172.17.0.1,127.0.0.1,zabbix-server
-      - ZBX_SERVER_ACTIVE=zabbix-server
+      - ZBX_SERVER_HOST=127.0.0.1,zabbix-server
     deploy:
       resources:
         limits:
           memory: 64M
+
+  # --- BLOC PROMETHEUS ---
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: prometheus
+    restart: unless-stopped
+    ports:
+      - "9090:9090"
+    volumes:
+      - /volume1/docker/prometheus/config:/etc/prometheus
+      - /volume1/docker/prometheus/data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+    deploy:
+      resources:
+        limits:
+          memory: 512M
+
+  # Node Exporter : Pour donner des métriques système à Prometheus
+  node-exporter:
+    image: prom/node-exporter:latest
+    container_name: node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
+  # --- BLOC VISUALISATION ---
+  grafana:
+    image: grafana/grafana-oss:latest
+    container_name: grafana
+    restart: unless-stopped
+    user: "1026:100"
+    ports:
+      - "3001:3000"
+    environment:
+      - TZ=Europe/Paris
+      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
+    volumes:
+      - /volume1/docker/grafana:/var/lib/grafana
+    depends_on:
+      - prometheus
+      - zabbix-server
+    deploy:
+      resources:
+        limits:
+          memory: 512M
