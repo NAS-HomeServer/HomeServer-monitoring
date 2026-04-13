@@ -3,6 +3,8 @@ version: '3.8'
 services:
   # --- BLOC ZABBIX ---
   zabbix-db:
+    ports:
+      - "3306:3306"
     image: mariadb:10.6
     container_name: zabbix-db
     restart: unless-stopped
@@ -23,13 +25,12 @@ services:
     image: zabbix/zabbix-server-mysql:latest
     container_name: zabbix-server
     restart: unless-stopped
-    ports:
-      - "10051:10051"
+    network_mode: host
     volumes:
       - /etc/localtime:/etc/localtime:ro
       - /volume1/docker/zabbix/alertscripts:/usr/lib/zabbix/alertscripts
     environment:
-      - DB_SERVER_HOST=zabbix-db
+      - DB_SERVER_HOST=127.0.0.1
       - MYSQL_DATABASE=zabbix
       - MYSQL_USER=zabbix
       - MYSQL_PASSWORD=zabbix_pwd
