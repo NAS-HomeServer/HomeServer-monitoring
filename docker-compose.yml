@@ -30,7 +30,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /volume1/docker/zabbix/alertscripts:/usr/lib/zabbix/alertscripts
     environment:
-      - DB_SERVER_HOST=127.0.0.1
+      - DB_SERVER_HOST=172.27.0.1
       - MYSQL_DATABASE=zabbix
       - MYSQL_USER=zabbix
       - MYSQL_PASSWORD=zabbix_pwd
@@ -52,7 +52,7 @@ services:
       - MYSQL_USER=zabbix
       - MYSQL_PASSWORD=zabbix_pwd
       - MYSQL_ROOT_PASSWORD=root_pwd
-      - ZBX_SERVER_HOST=zabbix-server
+      - ZBX_SERVER_HOST=172.27.0.1
       - PHP_TZ=Europe/Paris
     deploy:
       resources:
