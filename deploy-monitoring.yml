@@ -2,6 +2,7 @@
 - name: "IaC - Deploiement Stack Monitoring Zabbix"
   hosts: localhost
   connection: local
+  become : yes
 
   tasks:
     - name: "Creation des repertoires pour Zabbix"
@@ -9,7 +10,7 @@
         path: "/volume1/docker/zabbix/{{ item }}"
         state: directory
         mode: '0755'
-      with_items:
+      loop:
         - 'db_data'
         - 'alertscripts'
 
@@ -19,13 +20,10 @@
         state: directory
         mode: '0755'
 
-    - name: "Nettoyage des anciens conteneurs (si existants)"
-      shell: "docker-compose -p monitoring-homeserver -f /app/docker-compose.yml down"
-      args:
-        chdir: "/app"
-      failed_when: false # Très important : ne bloque pas si rien n'est à supprimer
-
-    - name: "Lancement Docker via Docker Compose"
-      shell: "docker-compose -p monitoring-homeserver -f /app/docker-compose.yml up -d --remove-orphans"
-      args:
-        chdir: "/app"
+    - name: "Gestion de la Stack Docker Compose (Zabbix & Grafana)"
+      community.docker.docker_compose_v2:
+        project_src: "/app"
+        project_name: "monitoring-homeserver"
+        state: present
+        pull: missing
+        remove_orphans: true 
