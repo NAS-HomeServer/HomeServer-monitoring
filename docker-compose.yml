@@ -103,12 +103,16 @@ services:
           memory: 32M
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:latest
+    image: ghcr.io/google/cadvisor:v0.52.1
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
     ports:
       - "8081:8080"
+    command:
+      - '--docker_only=true'
+      - '--store_container_labels=false'
+      - '--whitelisted_container_labels=com.docker.compose.service'
     volumes:
       - /:/rootfs:ro
       - /var/run:/var/run:rw
