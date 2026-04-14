@@ -4,7 +4,7 @@
 
   vars:
     zabbix_version: "alpine-7.4.9"
-    grafana_version: "11.6.1"       # à adapter selon ta version actuelle
+    grafana_version: "11.6.1"
 
   tasks:
     - name: "Creation des repertoires pour Zabbix"
@@ -15,11 +15,28 @@
       with_items:
         - 'db_data'
         - 'alertscripts'
+
     - name: "Creation du repertoire pour Grafana"
       file:
         path: "/volume1/docker/grafana"
         state: directory
         mode: '0755'
+
+    - name: "Creation du repertoire pour Prometheus"
+      file:
+        path: "/volume1/docker/prometheus/{{ item }}"
+        state: directory
+        mode: '0755'
+      with_items:
+        - 'config'
+        - 'data'
+
+    - name: "Creation du repertoire pour SNMP Exporter"
+      file:
+        path: "/volume1/docker/snmp"
+        state: directory
+        mode: '0755'
+
     - name: "Gestion de la Stack Docker Compose (Zabbix & Grafana)"
       community.docker.docker_compose_v2:
         project_src: "/app"
