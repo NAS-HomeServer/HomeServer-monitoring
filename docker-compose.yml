@@ -1,5 +1,5 @@
 services:
-  # --- BLOC ZABBIX ---
+  # --- BLOC ZABBIX --- 
   zabbix-db:
     image: mariadb:10.6
     container_name: zabbix-db
