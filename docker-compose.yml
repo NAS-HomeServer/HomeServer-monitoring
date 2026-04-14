@@ -44,7 +44,6 @@ services:
       - /var/run:/var/run:ro
       - /sys:/sys:ro
       - /volume1/@docker:/var/lib/docker:ro
-      - /dev/disk:/dev/disk:ro
     networks:
       - monitoring
     deploy:
