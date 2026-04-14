@@ -1,12 +1,10 @@
-version: '3.8'
-
 services:
   # --- BLOC ZABBIX ---
   zabbix-db:
-    ports:
-      - "3306:3306"
     image: mariadb:10.6
     container_name: zabbix-db
+    ports:
+      - "3306:3306"
     restart: unless-stopped
     command: --character-set-server=utf8 --collation-server=utf8_bin --default-authentication-plugin=mysql_native_password
     volumes:
@@ -22,7 +20,7 @@ services:
           memory: 512M
 
   zabbix-server:
-    image: zabbix/zabbix-server-mysql:latest
+    image: zabbix/zabbix-server-mysql:alpine-7.0-latest 
     container_name: zabbix-server
     restart: unless-stopped
     network_mode: host
@@ -30,7 +28,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - /volume1/docker/zabbix/alertscripts:/usr/lib/zabbix/alertscripts
     environment:
-      - DB_SERVER_HOST=172.27.0.1
+      - DB_SERVER_HOST=127.0.0.1
       - MYSQL_DATABASE=zabbix
       - MYSQL_USER=zabbix
       - MYSQL_PASSWORD=zabbix_pwd
@@ -41,7 +39,7 @@ services:
           memory: 256M
 
   zabbix-web:
-    image: zabbix/zabbix-web-apache-mysql:latest
+    image: zabbix/zabbix-web-apache-mysql:alpine-7.0-latest
     container_name: zabbix-web
     restart: unless-stopped
     ports:
@@ -52,7 +50,7 @@ services:
       - MYSQL_USER=zabbix
       - MYSQL_PASSWORD=zabbix_pwd
       - MYSQL_ROOT_PASSWORD=root_pwd
-      - ZBX_SERVER_HOST=172.27.0.1
+      - ZBX_SERVER_HOST=127.0.0.1
       - PHP_TZ=Europe/Paris
     deploy:
       resources:
@@ -60,14 +58,14 @@ services:
           memory: 256M
 
   zabbix-agent:
-    image: zabbix/zabbix-agent:latest
+    image: zabbix/zabbix-agent:alpine-7.0-latest
     container_name: zabbix-agent
     restart: unless-stopped
     privileged: true
     network_mode: host
     environment:
       - ZBX_HOSTNAME=Synology-NAS
-      - ZBX_SERVER_HOST=127.0.0.1,zabbix-server
+      - ZBX_SERVER_HOST=127.0.0.1
     deploy:
       resources:
         limits:
@@ -75,9 +73,9 @@ services:
 
   # --- BLOC PROMETHEUS ---
   prometheus:
-    image: prom/prometheus:latest
+    image: prom/prometheus:v3.1.0
     container_name: prometheus
-    user: "root"  # Force l'exécution en root pour régler les problèmes de droits sur le NAS
+    user: "root"
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -87,17 +85,14 @@ services:
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
-      - '--storage.tsdb.no-lockfile' # Crucial pour éviter les crashs sur Synology
-      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
-      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--storage.tsdb.no-lockfile'
     deploy:
       resources:
         limits:
           memory: 512M
 
-  # Node Exporter : Pour donner des métriques système à Prometheus
   node-exporter:
-    image: prom/node-exporter:latest
+    image: prom/node-exporter:v1.9.0
     container_name: node-exporter
     restart: unless-stopped
     ports:
@@ -109,7 +104,7 @@ services:
 
   # --- BLOC VISUALISATION ---
   grafana:
-    image: grafana/grafana-oss:latest
+    image: grafana/grafana-oss:11.5.0
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
