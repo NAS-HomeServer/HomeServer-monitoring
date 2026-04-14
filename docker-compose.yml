@@ -102,6 +102,36 @@ services:
         limits:
           memory: 32M
 
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:latest
+    container_name: cadvisor
+    restart: unless-stopped
+    privileged: true
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:rw
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+    deploy:
+      resources:
+        limits:
+          memory: 128M
+
+  snmp-exporter:
+    image: prom/snmp-exporter:latest
+    container_name: snmp-exporter
+    restart: unless-stopped
+    ports:
+      - "9116:9116"
+    volumes:
+      - /volume1/docker/snmp:/etc/snmp_exporter
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
   # --- BLOC VISUALISATION ---
   grafana:
     image: grafana/grafana:11.6.1
