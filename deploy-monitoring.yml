@@ -1,28 +1,14 @@
-- name: "IaC - Deploiement Stack Monitoring Zabbix"
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana)"
   hosts: localhost
   connection: local
 
   vars:
-    zabbix_version: "alpine-7.4.9"
     grafana_version: "11.6.1"
+    prometheus_version: "v3.1.0"
+    cadvisor_version: "v0.49.1"
 
   tasks:
-    - name: "Creation des repertoires pour Zabbix"
-      file:
-        path: "/volume1/docker/zabbix/{{ item }}"
-        state: directory
-        mode: '0755'
-      with_items:
-        - 'db_data'
-        - 'alertscripts'
-
-    - name: "Creation du repertoire pour Grafana"
-      file:
-        path: "/volume1/docker/grafana"
-        state: directory
-        mode: '0755'
-
-    - name: "Creation du repertoire pour Prometheus"
+    - name: "Creation des repertoires pour Prometheus"
       file:
         path: "/volume1/docker/prometheus/{{ item }}"
         state: directory
@@ -31,13 +17,13 @@
         - 'config'
         - 'data'
 
-    - name: "Creation du repertoire pour SNMP Exporter"
+    - name: "Creation du repertoire pour Grafana"
       file:
-        path: "/volume1/docker/snmp"
+        path: "/volume1/docker/grafana"
         state: directory
         mode: '0755'
 
-    - name: "Gestion de la Stack Docker Compose (Zabbix & Grafana)"
+    - name: "Gestion de la Stack Docker Compose (Prometheus & Grafana)"
       community.docker.docker_compose_v2:
         project_src: "/app"
         project_name: "monitoring-homeserver"
@@ -46,5 +32,6 @@
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
-        ZABBIX_VERSION: "{{ zabbix_version }}"
         GRAFANA_VERSION: "{{ grafana_version }}"
+        PROMETHEUS_VERSION: "{{ prometheus_version }}"
+        CADVISOR_VERSION: "{{ cadvisor_version }}"
