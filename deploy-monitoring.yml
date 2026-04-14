@@ -1,8 +1,10 @@
----
 - name: "IaC - Deploiement Stack Monitoring Zabbix"
   hosts: localhost
   connection: local
 
+  vars:
+    zabbix_version: "alpine-7.4.9"
+    grafana_version: "11.6.1"       # à adapter selon ta version actuelle
 
   tasks:
     - name: "Creation des repertoires pour Zabbix"
@@ -13,13 +15,11 @@
       with_items:
         - 'db_data'
         - 'alertscripts'
-
     - name: "Creation du repertoire pour Grafana"
       file:
         path: "/volume1/docker/grafana"
         state: directory
         mode: '0755'
-
     - name: "Gestion de la Stack Docker Compose (Zabbix & Grafana)"
       community.docker.docker_compose_v2:
         project_src: "/app"
@@ -29,3 +29,5 @@
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
+        ZABBIX_VERSION: "{{ zabbix_version }}"
+        GRAFANA_VERSION: "{{ grafana_version }}"
