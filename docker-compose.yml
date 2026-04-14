@@ -1,76 +1,4 @@
 services:
-  # --- BLOC ZABBIX --- 
-  zabbix-db:
-    image: mariadb:10.6
-    container_name: zabbix-db
-    ports:
-      - "3306:3306"
-    restart: unless-stopped
-    command: --character-set-server=utf8 --collation-server=utf8_bin --default-authentication-plugin=mysql_native_password
-    volumes:
-      - /volume1/docker/zabbix/db_data:/var/lib/mysql
-    environment:
-      - MYSQL_DATABASE=zabbix
-      - MYSQL_USER=zabbix
-      - MYSQL_PASSWORD=zabbix_pwd
-      - MYSQL_ROOT_PASSWORD=root_pwd
-    deploy:
-      resources:
-        limits:
-          memory: 512M
-
-  zabbix-server:
-    image: zabbix/zabbix-server-mysql:alpine-7.4.9
-    container_name: zabbix-server
-    restart: unless-stopped
-    network_mode: host
-    volumes:
-      - /etc/localtime:/etc/localtime:ro
-      - /volume1/docker/zabbix/alertscripts:/usr/lib/zabbix/alertscripts
-    environment:
-      - DB_SERVER_HOST=127.0.0.1
-      - MYSQL_DATABASE=zabbix
-      - MYSQL_USER=zabbix
-      - MYSQL_PASSWORD=zabbix_pwd
-      - MYSQL_ROOT_PASSWORD=root_pwd
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  zabbix-web:
-    image: zabbix/zabbix-web-apache-mysql:alpine-7.4.9
-    container_name: zabbix-web
-    restart: unless-stopped
-    ports:
-      - "8085:8080"
-    environment:
-      - DB_SERVER_HOST=zabbix-db
-      - MYSQL_DATABASE=zabbix
-      - MYSQL_USER=zabbix
-      - MYSQL_PASSWORD=zabbix_pwd
-      - MYSQL_ROOT_PASSWORD=root_pwd
-      - ZBX_SERVER_HOST=127.0.0.1
-      - PHP_TZ=Europe/Paris
-    deploy:
-      resources:
-        limits:
-          memory: 256M
-
-  zabbix-agent:
-    image: zabbix/zabbix-agent:alpine-7.4.9
-    container_name: zabbix-agent
-    restart: unless-stopped
-    privileged: true
-    network_mode: host
-    environment:
-      - ZBX_HOSTNAME=Synology-NAS
-      - ZBX_SERVER_HOST=127.0.0.1
-    deploy:
-      resources:
-        limits:
-          memory: 64M
-
   # --- BLOC PROMETHEUS ---
   prometheus:
     image: prom/prometheus:v3.1.0
@@ -103,38 +31,22 @@ services:
           memory: 32M
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.52.1
+    image: gcr.io/cadvisor/cadvisor:v0.49.1
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
     ports:
-      - "8081:8080"
-    command:
-      - '--docker_only=true'
-      - '--store_container_labels=false'
-      - '--whitelisted_container_labels=com.docker.compose.service'
+      - "8080:8080"
     volumes:
       - /:/rootfs:ro
-      - /var/run:/var/run:rw
+      - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /volume1/@docker:/var/lib/docker:ro 
+      - /var/lib/docker:/var/lib/docker:ro
+      - /dev/disk:/dev/disk:ro
     deploy:
       resources:
         limits:
           memory: 128M
-
-  snmp-exporter:
-    image: prom/snmp-exporter:latest
-    container_name: snmp-exporter
-    restart: unless-stopped
-    ports:
-      - "9116:9116"
-    volumes:
-      - /volume1/docker/snmp:/etc/snmp_exporter
-    deploy:
-      resources:
-        limits:
-          memory: 32M
 
   # --- BLOC VISUALISATION ---
   grafana:
@@ -146,12 +58,10 @@ services:
       - "3001:3000"
     environment:
       - TZ=Europe/Paris
-      - GF_INSTALL_PLUGINS=alexanderzobnin-zabbix-app
     volumes:
       - /volume1/docker/grafana:/var/lib/grafana
     depends_on:
       - prometheus
-      - zabbix-server
     deploy:
       resources:
         limits:
