@@ -2,7 +2,7 @@
 - name: "IaC - Deploiement Stack Monitoring Zabbix"
   hosts: localhost
   connection: local
-  become : yes
+
 
   tasks:
     - name: "Creation des repertoires pour Zabbix"
@@ -10,7 +10,7 @@
         path: "/volume1/docker/zabbix/{{ item }}"
         state: directory
         mode: '0755'
-      loop:
+      with_items:
         - 'db_data'
         - 'alertscripts'
 
@@ -26,4 +26,6 @@
         project_name: "monitoring-homeserver"
         state: present
         pull: missing
-        remove_orphans: true 
+        remove_orphans: true
+      environment:
+        DOCKER_API_VERSION: "1.43"
