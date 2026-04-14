@@ -20,7 +20,7 @@ services:
           memory: 512M
 
   zabbix-server:
-    image: zabbix/zabbix-server-mysql:alpine-7.0-latest 
+    image: zabbix/zabbix-server-mysql:alpine-7.4.9
     container_name: zabbix-server
     restart: unless-stopped
     network_mode: host
@@ -39,7 +39,7 @@ services:
           memory: 256M
 
   zabbix-web:
-    image: zabbix/zabbix-web-apache-mysql:alpine-7.0-latest
+    image: zabbix/zabbix-web-apache-mysql:alpine-7.4.9
     container_name: zabbix-web
     restart: unless-stopped
     ports:
@@ -58,7 +58,7 @@ services:
           memory: 256M
 
   zabbix-agent:
-    image: zabbix/zabbix-agent:alpine-7.0-latest
+    image: zabbix/zabbix-agent:alpine-7.4.9
     container_name: zabbix-agent
     restart: unless-stopped
     privileged: true
@@ -104,7 +104,7 @@ services:
 
   # --- BLOC VISUALISATION ---
   grafana:
-    image: grafana/grafana-oss:11.5.0
+    image: grafana/grafana:11.6.1
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
