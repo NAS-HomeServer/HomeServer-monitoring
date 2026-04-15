@@ -22,7 +22,10 @@
         path: "/volume1/docker/grafana"
         state: directory
         mode: '0755'
-
+        
+    - name: "Nettoyage des conteneurs fantômes"
+    command: docker container prune -f
+    
     - name: "Gestion de la Stack Docker Compose (Prometheus & Grafana)"
       community.docker.docker_compose_v2:
         project_src: "/app"
