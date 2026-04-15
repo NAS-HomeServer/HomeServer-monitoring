@@ -25,6 +25,8 @@
         
     - name: "Nettoyage des conteneurs fantômes"
       command: docker container prune -f
+      environment:
+        DOCKER_API_VERSION: "1.43"
     
     - name: "Gestion de la Stack Docker Compose (Prometheus & Grafana)"
       community.docker.docker_compose_v2:
