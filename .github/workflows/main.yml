@@ -43,4 +43,4 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /volume1/docker:/volume1/docker \
             ansible-runner-tmp \
-            ansible-playbook -i hosts.ini deploy-monitoring.yml
+            ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitoring.yml
