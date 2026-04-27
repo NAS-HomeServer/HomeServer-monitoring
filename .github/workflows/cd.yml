@@ -1,46 +1,130 @@
-name: Deploiement Automatique Monitoring
+name: Pipeline Monitoring
+
 on:
   push:
     branches:
       - main
+  pull_request:
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write  # pour upload SARIF
+
+concurrency:
+  group: deploy-monitoring-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  deploy:
-    runs-on: self-hosted
+  # ─────────── SAST : code & IaC ───────────
+  security-scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
-      - name: Nettoyage du repertoire sur Volume1
-        run: |
-          mkdir -p /volume1/docker/monitoring_workspace
-          rm -rf /volume1/docker/monitoring_workspace/*
+      - uses: actions/checkout@v4
 
-      - name: Recuperation du code (Fallback Curl)
-        run: |
-          cd /volume1/docker/monitoring_workspace
-          curl -f -L -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
+      - name: Semgrep (SAST)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/ci
+            p/security-audit
+            p/dockerfile
+            p/yaml
+            p/github-actions
+          generateSarif: true
 
-      - name: Execution Ansible via Docker
+      - name: Upload Semgrep SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: semgrep.sarif
+          category: semgrep
+
+      - name: Trivy - scan IaC & config
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          scan-type: config
+          scan-ref: .
+          format: sarif
+          output: trivy-config.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+
+      - name: Upload Trivy config SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-config.sarif
+          category: trivy-config
+
+  # ─────────── Build + scan image + deploy ───────────
+  deploy:
+    needs: security-scan
+    if: github.event_name != 'pull_request'
+    runs-on: self-hosted
+    timeout-minutes: 20
+    env:
+      WORKSPACE: /volume1/docker/monitoring_workspace
+      IMAGE_TAG: ansible-runner:${{ github.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: repo
+
+      - name: Préparation du workspace
         run: |
-          cd /volume1/docker/monitoring_workspace
-          
-          # 1. On remet la méthode COPY qui incluait tes fichiers avec succès
-          cat << 'EOF' > Dockerfile
-          FROM alpine/ansible:latest
-          RUN apk add --no-cache docker docker-compose
+          set -euo pipefail
+          mkdir -p "${WORKSPACE}"
+          find "${WORKSPACE}" -mindepth 1 -delete
+          cp -r repo/. "${WORKSPACE}/"
+
+      - name: Build image Ansible
+        working-directory: ${{ env.WORKSPACE }}
+        run: |
+          set -euo pipefail
+          cat > Dockerfile <<'EOF'
+          FROM alpine/ansible:11.1.0
+          RUN apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
           WORKDIR /app
+          USER 1026:100
           EOF
-          
-          # 2. On compile (tes fichiers yml et ini sont maintenant DANS l'image)
-          docker build -t ansible-runner-tmp .
-          
-          # 3. On lance (on garde le montage pour que Ansible puisse créer les dossiers Zabbix)
+          docker build -t "${IMAGE_TAG}" .
+
+      - name: Trivy - scan image
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.IMAGE_TAG }}
+          format: sarif
+          output: trivy-image.sarif
+          severity: CRITICAL,HIGH
+          exit-code: '1'
+          ignore-unfixed: true
+          vuln-type: os,library
+
+      - name: Upload Trivy image SARIF
+        if: always()
+        uses: github/codeql-action/upload-sarif@v3
+        with:
+          sarif_file: trivy-image.sarif
+          category: trivy-image
+
+      - name: Exécution du playbook
+        working-directory: ${{ env.WORKSPACE }}
+        run: |
+          set -euo pipefail
           docker run --rm \
+            --network none \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
+            -e DOCKER_API_VERSION=1.43 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /volume1/docker:/volume1/docker \
-            ansible-runner-tmp \
+            "${IMAGE_TAG}" \
             ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitoring.yml
+
+      - name: Nettoyage image
+        if: always()
+        run: docker rmi "${IMAGE_TAG}" || true
