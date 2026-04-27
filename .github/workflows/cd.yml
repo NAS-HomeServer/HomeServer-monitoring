@@ -1,141 +1,203 @@
-name: Pipeline Monitoring
+name: Pipeline HomeServer Monitoring
 
 on:
   push:
-    branches:
-      - main
-  pull_request:
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write  # pour upload SARIF
+  security-events: write
 
 concurrency:
   group: deploy-monitoring-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
-  # ─────────── SAST : code & IaC ───────────
-  security-scan:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    container:
-      image: semgrep/semgrep:1.95.0
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
 
-      - name: Semgrep (SAST)
-        run: |
-          semgrep scan \
-            --config p/ci \
-            --config p/security-audit \
-            --config p/dockerfile \
-            --config p/yaml \
-            --config p/github-actions \
-            --sarif --output=semgrep.sarif \
-            --error || true
-
-      - name: Upload Semgrep SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: semgrep.sarif
-          category: semgrep
-
-  trivy-iac:
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
-
-      - name: Trivy - scan IaC & config
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-        with:
-          scan-type: config
-          scan-ref: .
-          format: sarif
-          output: trivy-config.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '1'
-          ignore-unfixed: true
-
-      - name: Upload Trivy config SARIF
-        if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-config.sarif
-          category: trivy-config
-
-  # ─────────── Build + scan image + deploy ───────────
-  deploy:
-    needs: [security-scan, trivy-iac]
-    if: github.event_name != 'pull_request'
+  # ─────────────────────────────────────────
+  # JOB 1 — LINT
+  # ─────────────────────────────────────────
+  lint:
+    name: "① Lint"
     runs-on: self-hosted
-    timeout-minutes: 20
-    env:
-      WORKSPACE: /volume1/docker/monitoring_workspace
-      IMAGE_TAG: ansible-runner:${{ github.sha }}
-
+    timeout-minutes: 10
     steps:
-      - name: Checkout du code
-        uses: actions/checkout@v4
-        with:
-          path: repo
-
-      - name: Préparation du workspace
+      - name: Récupération du code
         run: |
           set -euo pipefail
-          mkdir -p "${WORKSPACE}"
-          find "${WORKSPACE}" -mindepth 1 -delete
-          cp -r repo/. "${WORKSPACE}/"
+          mkdir -p /volume1/docker/monitoring_workspace
+          cd /volume1/docker/monitoring_workspace
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
-      - name: Build image Ansible
-        working-directory: ${{ env.WORKSPACE }}
+      - name: ansible-lint
         run: |
-          set -euo pipefail
-          cat > Dockerfile <<'EOF'
+          docker run --rm \
+            -v /volume1/docker/monitoring_workspace:/workspace \
+            pipelinecomponents/ansible-lint:latest \
+            ansible-lint /workspace --profile=production
+
+      - name: yamllint
+        run: |
+          docker run --rm \
+            -v /volume1/docker/monitoring_workspace:/workspace \
+            pipelinecomponents/yamllint:latest \
+            yamllint /workspace --strict
+
+      - name: hadolint (Dockerfile lint)
+        run: |
+          docker run --rm -i hadolint/hadolint:latest hadolint \
+            --ignore DL3018 \
+            - << 'EOF'
           FROM alpine/ansible:11.1.0
-          RUN apk add --no-cache docker-cli docker-cli-compose
+          RUN apk update && apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
           WORKDIR /app
-          USER 1026:100
           EOF
-          docker build -t "${IMAGE_TAG}" .
 
-      - name: Trivy - scan image
-        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
-        with:
-          image-ref: ${{ env.IMAGE_TAG }}
-          format: sarif
-          output: trivy-image.sarif
-          severity: CRITICAL,HIGH
-          exit-code: '1'
-          ignore-unfixed: true
-          vuln-type: os,library
+  # ─────────────────────────────────────────
+  # JOB 2 — SECURITY SCAN
+  # ─────────────────────────────────────────
+  security-scan:
+    name: "② Security"
+    runs-on: self-hosted
+    needs: lint
+    timeout-minutes: 15
+    steps:
+      - name: Récupération du code
+        run: |
+          set -euo pipefail
+          mkdir -p /volume1/docker/monitoring_workspace
+          cd /volume1/docker/monitoring_workspace
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
-      - name: Upload Trivy image SARIF
+      - name: Gitleaks — détection de secrets
+        run: |
+          docker run --rm \
+            -v /volume1/docker/monitoring_workspace:/workspace \
+            zricethezav/gitleaks:latest \
+            detect --source /workspace \
+            --no-git \
+            --exit-code 1
+
+      - name: Semgrep — SAST
+        run: |
+          docker run --rm \
+            -v /volume1/docker/monitoring_workspace:/workspace \
+            -w /workspace \
+            semgrep/semgrep:1.95.0 \
+            semgrep scan \
+              --config p/ci \
+              --config p/security-audit \
+              --config p/dockerfile \
+              --config p/yaml \
+              --config p/github-actions \
+              --sarif --output=/workspace/semgrep.sarif \
+              --error || true
+
+      - name: Trivy — scan IaC & fichiers de config
+        run: |
+          docker run --rm \
+            -v /volume1/docker/monitoring_workspace:/workspace \
+            ghcr.io/aquasecurity/trivy:0.70.0 \
+            config \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --format sarif \
+            --output /workspace/trivy-iac.sarif \
+            /workspace
+
+      - name: Upload SARIF → GitHub Security tab
         if: always()
-        uses: github/codeql-action/upload-sarif@v3
-        with:
-          sarif_file: trivy-image.sarif
-          category: trivy-image
+        run: |
+          set -euo pipefail
+          for f in /volume1/docker/monitoring_workspace/semgrep.sarif \
+                   /volume1/docker/monitoring_workspace/trivy-iac.sarif; do
+            [ -f "$f" ] || continue
+            echo "Upload de $f"
+            curl -fsSL \
+              -X POST \
+              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
+              -H "Accept: application/vnd.github+json" \
+              -H "Content-Type: application/json" \
+              https://api.github.com/repos/${{ github.repository }}/code-scanning/sarifs \
+              -d "{\"commit_sha\":\"${{ github.sha }}\",\"ref\":\"refs/heads/main\",\"sarif\":\"$(gzip -c $f | base64 -w0)\"}"
+          done
+
+  # ─────────────────────────────────────────
+  # JOB 3 — DEPLOY
+  # ─────────────────────────────────────────
+  deploy:
+    name: "③ Deploy"
+    runs-on: self-hosted
+    needs: security-scan
+    environment: production
+    timeout-minutes: 20
+    steps:
+      - name: Nettoyage du repertoire
+        run: |
+          set -euo pipefail
+          mkdir -p /volume1/docker/monitoring_workspace
+          find /volume1/docker/monitoring_workspace -mindepth 1 -delete
+
+      - name: Récupération du code
+        run: |
+          set -euo pipefail
+          cd /volume1/docker/monitoring_workspace
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
+
+      - name: Build image Ansible
+        run: |
+          set -euo pipefail
+          cd /volume1/docker/monitoring_workspace
+          cat > Dockerfile <<'EOF'
+          FROM alpine/ansible:11.1.0
+          RUN apk update && apk add --no-cache docker-cli docker-cli-compose
+          COPY . /app
+          WORKDIR /app
+          EOF
+          DOCKER_BUILDKIT=0 docker build -t ansible-runner:${{ github.sha }} .
+
+      - name: Trivy — scan image construite
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            ghcr.io/aquasecurity/trivy:0.70.0 \
+            image \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignore-unfixed \
+            ansible-runner:${{ github.sha }}
 
       - name: Exécution du playbook
-        working-directory: ${{ env.WORKSPACE }}
         run: |
           set -euo pipefail
           docker run --rm \
-            --network none \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
+            -e ANSIBLE_FORCE_COLOR=1 \
             -e DOCKER_API_VERSION=1.43 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /volume1/docker:/volume1/docker \
-            "${IMAGE_TAG}" \
-            ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitoring.yml
+            ansible-runner:${{ github.sha }} \
+            ansible-playbook \
+              -i ansible/inventory/hosts.ini \
+              ansible/playbooks/deploy-monitoring.yml
 
-      - name: Nettoyage image
+      - name: Cleanup image
         if: always()
-        run: docker rmi "${IMAGE_TAG}" || true
+        run: docker rmi ansible-runner:${{ github.sha }} || true
