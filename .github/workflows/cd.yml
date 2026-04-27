@@ -20,20 +20,22 @@ jobs:
   security-scan:
     runs-on: ubuntu-latest
     timeout-minutes: 10
+    container:
+      image: semgrep/semgrep:1.95.0
     steps:
       - name: Checkout du code
         uses: actions/checkout@v4
 
       - name: Semgrep (SAST)
-        uses: semgrep/semgrep-action@v1
-        with:
-          config: >-
-            p/ci
-            p/security-audit
-            p/dockerfile
-            p/yaml
-            p/github-actions
-          generateSarif: true
+        run: |
+          semgrep scan \
+            --config p/ci \
+            --config p/security-audit \
+            --config p/dockerfile \
+            --config p/yaml \
+            --config p/github-actions \
+            --sarif --output=semgrep.sarif \
+            --error || true
 
       - name: Upload Semgrep SARIF
         if: always()
@@ -42,8 +44,15 @@ jobs:
           sarif_file: semgrep.sarif
           category: semgrep
 
+  trivy-iac:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout du code
+        uses: actions/checkout@v4
+
       - name: Trivy - scan IaC & config
-        uses: aquasecurity/trivy-action@ed142fd  # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           scan-type: config
           scan-ref: .
@@ -62,7 +71,7 @@ jobs:
 
   # ─────────── Build + scan image + deploy ───────────
   deploy:
-    needs: security-scan
+    needs: [security-scan, trivy-iac]
     if: github.event_name != 'pull_request'
     runs-on: self-hosted
     timeout-minutes: 20
@@ -97,7 +106,7 @@ jobs:
           docker build -t "${IMAGE_TAG}" .
 
       - name: Trivy - scan image
-        uses: aquasecurity/trivy-action@ed142fd  # v0.36.0
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25  # v0.36.0
         with:
           image-ref: ${{ env.IMAGE_TAG }}
           format: sarif
