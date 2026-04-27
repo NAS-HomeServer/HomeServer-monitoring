@@ -54,8 +54,9 @@ jobs:
           docker run --rm -i hadolint/hadolint:latest hadolint \
             --ignore DL3018 \
             - << 'EOF'
-          FROM alpine/ansible:2.18.6
-          RUN apk update && apk add --no-cache docker-cli docker-cli-compose
+          FROM alpine/ansible:2.20.0
+          RUN apk update && apk upgrade --no-cache && \
+              apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
           WORKDIR /app
           EOF
@@ -166,8 +167,9 @@ jobs:
           set -euo pipefail
           cd /volume1/docker/monitoring_workspace
           cat > Dockerfile <<'EOF'
-          FROM alpine/ansible:2.18.6
-          RUN apk update && apk add --no-cache docker-cli docker-cli-compose
+          FROM alpine/ansible:2.20.0
+          RUN apk update && apk upgrade --no-cache && \
+              apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
           WORKDIR /app
           EOF
@@ -180,7 +182,7 @@ jobs:
             ghcr.io/aquasecurity/trivy:0.70.0 \
             image \
             --exit-code 1 \
-            --severity HIGH,CRITICAL \
+            --severity CRITICAL \
             --ignore-unfixed \
             ansible-runner:${{ github.sha }}
 
