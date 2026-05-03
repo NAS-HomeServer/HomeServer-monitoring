@@ -10,7 +10,7 @@
   tasks:
     - name: "Creation des repertoires pour Prometheus"
       file:
-        path: "/volume1/docker/prometheus/{{ item }}"
+        path: "/volume2/docker/prometheus/{{ item }}"
         state: directory
         mode: '0755'
       with_items:
@@ -19,7 +19,7 @@
 
     - name: "Creation du repertoire pour Grafana"
       file:
-        path: "/volume1/docker/grafana"
+        path: "/volume2/docker/grafana"
         state: directory
         mode: '0755'
         

@@ -26,8 +26,8 @@ jobs:
       - name: Récupération du code
         run: |
           set -euo pipefail
-          mkdir -p /volume1/docker/monitoring_workspace
-          cd /volume1/docker/monitoring_workspace
+          mkdir -p /volume2/docker/monitoring_workspace
+          cd /volume2/docker/monitoring_workspace
           curl -f -L \
             -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
@@ -38,14 +38,14 @@ jobs:
       - name: ansible-lint
         run: |
           docker run --rm \
-            -v /volume1/docker/monitoring_workspace:/workspace \
+            -v /volume2/docker/monitoring_workspace:/workspace \
             pipelinecomponents/ansible-lint:latest \
             ansible-lint /workspace --profile=production
 
       - name: yamllint
         run: |
           docker run --rm \
-            -v /volume1/docker/monitoring_workspace:/workspace \
+            -v /volume2/docker/monitoring_workspace:/workspace \
             pipelinecomponents/yamllint:latest \
             yamllint /workspace --strict
 
@@ -73,8 +73,8 @@ jobs:
       - name: Récupération du code
         run: |
           set -euo pipefail
-          mkdir -p /volume1/docker/monitoring_workspace
-          cd /volume1/docker/monitoring_workspace
+          mkdir -p /volume2/docker/monitoring_workspace
+          cd /volume2/docker/monitoring_workspace
           curl -f -L \
             -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
@@ -85,7 +85,7 @@ jobs:
       - name: Gitleaks — détection de secrets
         run: |
           docker run --rm \
-            -v /volume1/docker/monitoring_workspace:/workspace \
+            -v /volume2/docker/monitoring_workspace:/workspace \
             zricethezav/gitleaks:latest \
             detect --source /workspace \
             --no-git \
@@ -94,7 +94,7 @@ jobs:
       - name: Semgrep — SAST
         run: |
           docker run --rm \
-            -v /volume1/docker/monitoring_workspace:/workspace \
+            -v /volume2/docker/monitoring_workspace:/workspace \
             -w /workspace \
             semgrep/semgrep:1.95.0 \
             semgrep scan \
@@ -109,7 +109,7 @@ jobs:
       - name: Trivy — scan IaC & fichiers de config
         run: |
           docker run --rm \
-            -v /volume1/docker/monitoring_workspace:/workspace \
+            -v /volume2/docker/monitoring_workspace:/workspace \
             ghcr.io/aquasecurity/trivy:0.70.0 \
             config \
             --exit-code 1 \
@@ -122,8 +122,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          for f in /volume1/docker/monitoring_workspace/semgrep.sarif \
-                   /volume1/docker/monitoring_workspace/trivy-iac.sarif; do
+          for f in /volume2/docker/monitoring_workspace/semgrep.sarif \
+                   /volume2/docker/monitoring_workspace/trivy-iac.sarif; do
             [ -f "$f" ] || continue
             echo "Upload de $f"
             curl -fsSL \
@@ -148,13 +148,13 @@ jobs:
       - name: Nettoyage du repertoire
         run: |
           set -euo pipefail
-          mkdir -p /volume1/docker/monitoring_workspace
-          find /volume1/docker/monitoring_workspace -mindepth 1 -delete
+          mkdir -p /volume2/docker/monitoring_workspace
+          find /volume2/docker/monitoring_workspace -mindepth 1 -delete
 
       - name: Récupération du code
         run: |
           set -euo pipefail
-          cd /volume1/docker/monitoring_workspace
+          cd /volume2/docker/monitoring_workspace
           curl -f -L \
             -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
             https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
@@ -165,7 +165,7 @@ jobs:
       - name: Build image Ansible
         run: |
           set -euo pipefail
-          cd /volume1/docker/monitoring_workspace
+          cd /volume2/docker/monitoring_workspace
           cat > Dockerfile <<'EOF'
           FROM alpine/ansible:2.20.0
           RUN apk update && apk upgrade --no-cache && \
@@ -194,7 +194,7 @@ jobs:
             -e ANSIBLE_FORCE_COLOR=1 \
             -e DOCKER_API_VERSION=1.43 \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /volume1/docker:/volume1/docker \
+            -v /volume2/docker:/volume2/docker \
             ansible-runner:${{ github.sha }} \
             ansible-playbook \
               -i ansible/inventory/hosts.ini \
