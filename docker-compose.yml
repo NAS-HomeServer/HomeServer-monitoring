@@ -8,8 +8,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - /volume1/docker/prometheus/config:/etc/prometheus
-      - /volume1/docker/prometheus/data:/prometheus
+      - /volume2/docker/prometheus/config:/etc/prometheus
+      - /volume2/docker/prometheus/data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -45,7 +45,7 @@ services:
       - /:/rootfs:ro
       - /var/run:/var/run:ro
       - /sys:/sys:ro
-      - /volume1/@docker:/var/lib/docker:ro
+      - /volume2/@docker:/var/lib/docker:ro
     networks:
       - monitoring
     deploy:
@@ -64,7 +64,7 @@ services:
     environment:
       - TZ=Europe/Paris
     volumes:
-      - /volume1/docker/grafana:/var/lib/grafana
+      - /volume2/docker/grafana:/var/lib/grafana
     depends_on:
       - prometheus
     networks:
