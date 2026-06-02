@@ -1,4 +1,4 @@
-- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana)"
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana)"   
   hosts: localhost
   connection: local
 
