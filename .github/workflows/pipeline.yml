@@ -35,6 +35,13 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
+      - name: Partage du code aux jobs suivants
+        uses: actions/upload-artifact@v4
+        with:
+          name: source-code
+          path: /volume2/docker/monitoring_workspace
+          retention-days: 1
+
       - name: ansible-lint
         run: |
           docker run --rm \
@@ -70,17 +77,17 @@ jobs:
     needs: lint
     timeout-minutes: 15
     steps:
-      - name: Récupération du code
+      - name: Nettoyage du répertoire
         run: |
           set -euo pipefail
           mkdir -p /volume2/docker/monitoring_workspace
-          cd /volume2/docker/monitoring_workspace
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
-            -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
+          find /volume2/docker/monitoring_workspace -mindepth 1 -delete
+
+      - name: Récupération du code (artifact du job lint)
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: /volume2/docker/monitoring_workspace
 
       - name: Gitleaks — détection de secrets
         run: |
@@ -145,22 +152,17 @@ jobs:
     environment: production
     timeout-minutes: 20
     steps:
-      - name: Nettoyage du repertoire
+      - name: Nettoyage du répertoire
         run: |
           set -euo pipefail
           mkdir -p /volume2/docker/monitoring_workspace
           find /volume2/docker/monitoring_workspace -mindepth 1 -delete
 
-      - name: Récupération du code
-        run: |
-          set -euo pipefail
-          cd /volume2/docker/monitoring_workspace
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/NAS-HomeServer/Monitoring_HomeServer/tarball/main \
-            -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
+      - name: Récupération du code (artifact du job lint)
+        uses: actions/download-artifact@v4
+        with:
+          name: source-code
+          path: /volume2/docker/monitoring_workspace
 
       - name: Build image Ansible
         run: |
