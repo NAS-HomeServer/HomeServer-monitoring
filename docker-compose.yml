@@ -24,7 +24,7 @@ services:
           memory: 256M
 
   node-exporter:
-    image: prom/node-exporter:v1.9.0
+    image: prom/node-exporter:v1.12.1
     container_name: node-exporter
     restart: unless-stopped
     ports:
