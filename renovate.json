@@ -1,25 +1,61 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["config:recommended"],
+  "extends": ["config:recommended", ":dependencyDashboard", ":semanticCommits"],
   "timezone": "Europe/Paris",
-  "schedule": ["after 8am and before 11am"],
+  "schedule": ["after 8am and before 11am on monday"],
   "prHourlyLimit": 5,
   "prConcurrentLimit": 3,
   "labels": ["renovate", "dependencies"],
+  "dependencyDashboard": true,
+  "dependencyDashboardTitle": "📦 Renovate Dashboard",
+  "rangeStrategy": "bump",
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 5am on monday"]
+  },
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "labels": ["security"],
+    "prPriority": 10
+  },
+  "osvVulnerabilityAlerts": true,
   "packageRules": [
     {
-      "description": "Toutes les images docker-compose — PR sans automerge",
+      "description": "Docker-compose : pas d'automerge, review manuelle",
       "matchManagers": ["docker-compose"],
       "automerge": false,
       "commitMessagePrefix": "🐳 docker:",
       "labels": ["docker", "dependencies"]
     },
     {
-      "description": "GitHub Actions — grouper et autoriser majors",
+      "description": "GitHub Actions : groupées, minor/patch en automerge",
       "matchManagers": ["github-actions"],
       "groupName": "github actions",
-      "automerge": false,
+      "matchUpdateTypes": ["minor", "patch"],
+      "automerge": true,
+      "automergeType": "pr",
       "labels": ["ci", "dependencies"]
+    },
+    {
+      "description": "GitHub Actions majors : review manuelle",
+      "matchManagers": ["github-actions"],
+      "matchUpdateTypes": ["major"],
+      "automerge": false,
+      "labels": ["ci", "dependencies", "major"]
+    },
+    {
+      "description": "Ansible collections/roles",
+      "matchManagers": ["ansible", "ansible-galaxy"],
+      "automerge": false,
+      "commitMessagePrefix": "⚙️ ansible:",
+      "labels": ["ansible", "dependencies"]
+    },
+    {
+      "description": "Digest pinning docker images : automerge silencieux",
+      "matchManagers": ["docker-compose"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "automergeType": "pr"
     }
   ]
 }
