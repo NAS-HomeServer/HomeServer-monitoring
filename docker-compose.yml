@@ -1,7 +1,7 @@
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
-    image: prom/prometheus:v3.1.0
+    image: prom/prometheus:v3.13.1
     container_name: prometheus
     user: "root"
     restart: unless-stopped
@@ -24,7 +24,7 @@ services:
           memory: 256M
 
   node-exporter:
-    image: prom/node-exporter:v1.9.0
+    image: prom/node-exporter:v1.12.1
     container_name: node-exporter
     restart: unless-stopped
     ports:
@@ -37,7 +37,7 @@ services:
           memory: 32M
 
   cadvisor:
-    image: gcr.io/cadvisor/cadvisor:v0.49.1
+    image: gcr.io/cadvisor/cadvisor:v0.55.1
     container_name: cadvisor
     restart: unless-stopped
     privileged: true
@@ -55,7 +55,7 @@ services:
 
   # --- BLOC VISUALISATION ---
   grafana:
-    image: grafana/grafana:11.6.16
+    image: grafana/grafana:13.1.0
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
