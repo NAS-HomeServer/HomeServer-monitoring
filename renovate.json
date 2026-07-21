@@ -1,0 +1,25 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "timezone": "Europe/Paris",
+  "schedule": ["after 8am and before 11am"],
+  "prHourlyLimit": 5,
+  "prConcurrentLimit": 3,
+  "labels": ["renovate", "dependencies"],
+  "packageRules": [
+    {
+      "description": "Toutes les images docker-compose — PR sans automerge",
+      "matchManagers": ["docker-compose"],
+      "automerge": false,
+      "commitMessagePrefix": "🐳 docker:",
+      "labels": ["docker", "dependencies"]
+    },
+    {
+      "description": "GitHub Actions — grouper et autoriser majors",
+      "matchManagers": ["github-actions"],
+      "groupName": "github actions",
+      "automerge": false,
+      "labels": ["ci", "dependencies"]
+    }
+  ]
+}
