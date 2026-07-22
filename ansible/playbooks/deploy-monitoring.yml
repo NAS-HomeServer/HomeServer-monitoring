@@ -1,11 +1,10 @@
-- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana)"   
+---
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / cAdvisor)"
   hosts: localhost
   connection: local
-
   vars:
-    grafana_version: "11.6.1"
-    prometheus_version: "v3.1.0"
-    cadvisor_version: "v0.49.1"
+    compose_project_dir: "/app"          # dossier contenant docker-compose.yml
+    compose_project_name: "monitoring-homeserver"
 
   tasks:
     - name: "Creation des repertoires pour Prometheus"
@@ -22,21 +21,18 @@
         path: "/volume2/docker/grafana"
         state: directory
         mode: '0755'
-        
-    - name: "Nettoyage des conteneurs fantômes"
+
+    - name: "Nettoyage des conteneurs fantomes"
       command: docker container prune -f
       environment:
         DOCKER_API_VERSION: "1.43"
-    
-    - name: "Gestion de la Stack Docker Compose (Prometheus & Grafana)"
+
+    - name: "Gestion de la Stack Docker Compose (versions gerees directement dans docker-compose.yml, mises a jour via Renovate)"
       community.docker.docker_compose_v2:
-        project_src: "/app"
-        project_name: "monitoring-homeserver"
+        project_src: "{{ compose_project_dir }}"
+        project_name: "{{ compose_project_name }}"
         state: present
         pull: missing
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
-        GRAFANA_VERSION: "{{ grafana_version }}"
-        PROMETHEUS_VERSION: "{{ prometheus_version }}"
-        CADVISOR_VERSION: "{{ cadvisor_version }}"
