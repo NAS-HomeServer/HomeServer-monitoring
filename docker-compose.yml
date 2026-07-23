@@ -90,3 +90,4 @@ services:
 networks:
   monitoring:
     driver: bridge
+    name: monitoring-homeserver
