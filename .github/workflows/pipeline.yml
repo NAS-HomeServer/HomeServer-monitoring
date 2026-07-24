@@ -164,6 +164,14 @@ jobs:
           name: source-code
           path: /volume2/docker/monitoring_workspace
 
+      - name: Créer le fichier .env avec les secrets
+        run: |
+          set -euo pipefail
+          {
+            echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}"
+          } > /volume2/docker/monitoring_workspace/.env
+          chmod 600 /volume2/docker/monitoring_workspace/.env
+
       - name: Build image Ansible
         run: |
           set -euo pipefail
