@@ -18,6 +18,7 @@ services:
       - '--storage.tsdb.retention.size=256MB'
       - '--storage.tsdb.min-block-duration=2h'
       - '--storage.tsdb.max-block-duration=2h'
+      - '--web.enable-lifecycle'
     networks:
       - monitoring
     deploy:
@@ -59,6 +60,26 @@ services:
       resources:
         limits:
           memory: 200M
+
+  # --- BLOC ALERTING ---
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: alertmanager
+    restart: unless-stopped
+    ports:
+      - "9093:9093"
+    volumes:
+      - /volume2/docker/alertmanager/config:/etc/alertmanager
+      - /volume2/docker/alertmanager/data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 64M
 
   # --- BLOC VISUALISATION ---
   grafana:
