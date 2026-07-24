@@ -81,6 +81,19 @@ services:
         limits:
           memory: 64M
 
+  alertmanager-discord:
+    image: benjojo/alertmanager-discord:latest
+    container_name: alertmanager-discord
+    restart: unless-stopped
+    environment:
+      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
+    networks:
+      - monitoring
+    deploy:
+      resources:
+        limits:
+          memory: 32M
+
   # --- BLOC VISUALISATION ---
   grafana:
     image: grafana/grafana:13.1.1
