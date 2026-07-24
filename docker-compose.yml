@@ -86,7 +86,7 @@ services:
     container_name: alertmanager-discord
     restart: unless-stopped
     environment:
-      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
+      - DISCORD_WEBHOOK=https://discord.com/api/webhooks/REVOKED/REVOKED
     networks:
       - monitoring
     deploy:
