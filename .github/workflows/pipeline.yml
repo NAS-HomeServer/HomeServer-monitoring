@@ -84,7 +84,7 @@ jobs:
           find /volume2/docker/monitoring_workspace -mindepth 1 -delete
 
       - name: Récupération du code (artifact du job lint)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: source-code
           path: /volume2/docker/monitoring_workspace
@@ -159,7 +159,7 @@ jobs:
           find /volume2/docker/monitoring_workspace -mindepth 1 -delete
 
       - name: Récupération du code (artifact du job lint)
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@v4
         with:
           name: source-code
           path: /volume2/docker/monitoring_workspace
