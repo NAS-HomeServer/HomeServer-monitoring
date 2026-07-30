@@ -16,10 +16,10 @@ concurrency:
 jobs:
 
   # ─────────────────────────────────────────
-  # JOB 1 — LINT
+  # JOB 1 — Code Quality
   # ─────────────────────────────────────────
   lint:
-    name: "① Lint"
+    name: "① Code Quality"
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
