@@ -27,7 +27,7 @@
       environment:
         DOCKER_API_VERSION: "1.43"
 
-    - name: "Gestion de la Stack Docker Compose (versions gerees directement dans docker-compose.yml, mises a jour via Renovate)"
+    - name: "Gestion de la Stack Docker Compose"
       community.docker.docker_compose_v2:
         project_src: "{{ compose_project_dir }}"
         project_name: "{{ compose_project_name }}"
@@ -36,3 +36,5 @@
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
+        DISCORD_WEBHOOK_URL: "{{ discord_webhook_url }}"
+        DISCORD_USERNAME: "Alertmanager"
