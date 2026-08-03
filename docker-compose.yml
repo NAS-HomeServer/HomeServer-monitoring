@@ -63,7 +63,7 @@ services:
 
   # --- BLOC ALERTING ---
   alertmanager:
-    image: prom/alertmanager:v0.32.0
+    image: prom/alertmanager:v0.33.1
     container_name: alertmanager
     restart: unless-stopped
     ports:
