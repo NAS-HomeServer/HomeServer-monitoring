@@ -82,7 +82,7 @@ services:
           memory: 64M
 
   alertmanager-discord:
-    image: benjojo/alertmanager-discord:latest
+    image: rogerrum/alertmanager-discord:main
     container_name: alertmanager-discord
     restart: unless-stopped
     environment:
