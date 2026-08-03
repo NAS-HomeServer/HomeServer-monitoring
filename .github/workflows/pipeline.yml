@@ -199,6 +199,7 @@ jobs:
       - name: Exécution du playbook
         run: |
           set -euo pipefail
+          set -a; source /volume2/docker/monitoring_workspace/.env; set +a
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e ANSIBLE_FORCE_COLOR=1 \
@@ -208,7 +209,8 @@ jobs:
             ansible-runner:${{ github.sha }} \
             ansible-playbook \
               -i ansible/inventory/hosts.ini \
-              ansible/playbooks/deploy-monitoring.yml
+              ansible/playbooks/deploy-monitoring.yml \
+              --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}"
 
       - name: Cleanup image
         if: always()
