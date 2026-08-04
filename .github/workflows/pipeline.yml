@@ -2,7 +2,7 @@ name: Pipeline HomeServer Monitoring
 
 on:
   push:
-    branches: [main]
+    branches: [ main ]
   workflow_dispatch:
 
 permissions:
@@ -195,6 +195,24 @@ jobs:
             --severity CRITICAL \
             --ignore-unfixed \
             ansible-runner:${{ github.sha }}
+
+      - name: Trivy — génération SBOM (CycloneDX)
+        run: |
+          docker run --rm \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /volume2/docker/monitoring_workspace:/workspace \
+            ghcr.io/aquasecurity/trivy:0.70.0 \
+            image \
+            --format cyclonedx \
+            --output /workspace/sbom.cdx.json \
+            ansible-runner:${{ github.sha }}
+
+      - name: Upload SBOM (artifact)
+        uses: actions/upload-artifact@v7
+        with:
+          name: sbom-${{ github.sha }}
+          path: /volume2/docker/monitoring_workspace/sbom.cdx.json
+          retention-days: 90
 
       - name: Exécution du playbook
         run: |
