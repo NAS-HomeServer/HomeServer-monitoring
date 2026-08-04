@@ -117,7 +117,7 @@ jobs:
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
-            ghcr.io/aquasecurity/trivy:0.70.0 \
+            ghcr.io/aquasecurity/trivy:0.73.0 \
             config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
@@ -189,7 +189,7 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/aquasecurity/trivy:0.70.0 \
+            ghcr.io/aquasecurity/trivy:0.73.0 \
             image \
             --exit-code 1 \
             --severity CRITICAL \
@@ -200,12 +200,9 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            -v /volume2/docker/monitoring_workspace:/workspace \
-            ghcr.io/aquasecurity/trivy:0.70.0 \
-            image \
-            --format cyclonedx \
-            --output /workspace/sbom.cdx.json \
-            ansible-runner:${{ github.sha }}
+            ghcr.io/aquasecurity/trivy:0.73.0 \
+            image --format cyclonedx ansible-runner:${{ github.sha }} \
+            > /volume2/docker/monitoring_workspace/sbom.cdx.json
 
       - name: Upload SBOM (artifact)
         uses: actions/upload-artifact@v7
