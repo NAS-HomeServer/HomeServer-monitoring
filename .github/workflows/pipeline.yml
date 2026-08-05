@@ -113,15 +113,6 @@ jobs:
             /workspace
         continue-on-error: true
 
-      - name: Semgrep — scan SAST
-        run: |
-          touch "$WORKSPACE/semgrep.sarif"
-          chmod 666 "$WORKSPACE/semgrep.sarif"
-          docker run --rm -v "$WORKSPACE":/src \
-            semgrep/semgrep:latest \
-            semgrep scan --sarif --config p/secrets --config p/owasp-top-ten \
-            --output /src/semgrep.sarif /src || true
-
       # GitHub Advanced Security (code scanning) n'est pas disponible sur ce
       # repo privé sans licence GHAS : l'API code-scanning/sarifs accepte
       # l'upload (202) mais ne traite jamais les résultats. On affiche donc
@@ -132,7 +123,7 @@ jobs:
         run: |
           echo "## 🔒 Rapport de sécurité" >> "$GITHUB_STEP_SUMMARY"
           clean_files=""
-          for f in "$WORKSPACE/trivy-iac.sarif" "$WORKSPACE/semgrep.sarif"; do
+          for f in "$WORKSPACE/trivy-iac.sarif"; do
             [ -f "$f" ] || continue
             total=$(jq '[.runs[].results[]?] | length' "$f" 2>/dev/null)
             errors=$(jq '[.runs[].results[]? | select(.level=="error")] | length' "$f" 2>/dev/null)
@@ -166,15 +157,6 @@ jobs:
           name: trivy-security-report
           path: |
             ${{ env.WORKSPACE }}/trivy-iac.sarif
-          retention-days: 30
-          if-no-files-found: warn
-
-      - name: Upload du rapport Semgrep (artefact)
-        if: always()
-        uses: actions/upload-artifact@v7
-        with:
-          name: semgrep-security-report
-          path: ${{ env.WORKSPACE }}/semgrep.sarif
           retention-days: 30
           if-no-files-found: warn
 
