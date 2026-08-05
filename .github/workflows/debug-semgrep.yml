@@ -1,0 +1,24 @@
+name: Debug Semgrep
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug-semgrep:
+    name: "🔧 Debug Semgrep"
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      - name: Debug réseau Semgrep
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            semgrep/semgrep:1.95.0 \
+            -c "wget -qO- --timeout=10 -S https://semgrep.dev/ 2>&1 | head -20; echo EXIT:\$?"
+
+      - name: Semgrep — SAST (full debug)
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            semgrep/semgrep:1.95.0 \
+            -c "mkdir -p /workspace && cd /workspace && semgrep scan --config p/ci --debug 2>&1 | tail -60"
