@@ -23,12 +23,11 @@ jobs:
 
       - name: Semgrep debug complet vers fichier
         run: |
-          mkdir -p /volume2/docker/monitoring_workspace/_debug_output
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
             -w /workspace \
             semgrep/semgrep:1.95.0 \
-            sh -c "semgrep scan --config p/ci --debug > /workspace/_debug_output/full.log 2>&1; echo EXIT:\$? >> /workspace/_debug_output/full.log"
+            sh -c "mkdir -p /workspace/_debug_output && semgrep scan --config p/ci --debug > /workspace/_debug_output/full.log 2>&1; echo EXIT:\$? >> /workspace/_debug_output/full.log"
         continue-on-error: true
 
       - name: Upload log complet
