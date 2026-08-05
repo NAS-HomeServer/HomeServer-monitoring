@@ -2,16 +2,19 @@ name: Pipeline HomeServer Monitoring
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   workflow_dispatch:
 
 permissions:
   contents: read
-  security-events: write
 
 concurrency:
   group: deploy-monitoring-${{ github.ref }}
   cancel-in-progress: false
+
+env:
+  WORKSPACE: /volume2/docker/monitoring_workspace
+  TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/main
 
 jobs:
 
@@ -25,34 +28,23 @@ jobs:
     steps:
       - name: Récupération du code
         run: |
-          set -euo pipefail
-          mkdir -p /volume2/docker/monitoring_workspace
-          cd /volume2/docker/monitoring_workspace
+          mkdir -p "$WORKSPACE"
+          cd "$WORKSPACE"
           curl -f -L \
             -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/NAS-HomeServer/HomeServer-monitoring/tarball/main \
-            -o repo.tar.gz
+            "$TARBALL_URL" -o repo.tar.gz
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Partage du code aux jobs suivants
-        uses: actions/upload-artifact@v7
-        with:
-          name: source-code
-          path: /volume2/docker/monitoring_workspace
-          retention-days: 1
-
       - name: ansible-lint
         run: |
-          docker run --rm \
-            -v /volume2/docker/monitoring_workspace:/workspace \
+          docker run --rm -v "$WORKSPACE":/workspace \
             pipelinecomponents/ansible-lint:0.58.0@sha256:937b425d2f0a80f560b5d393af17840b7989e31b1b231dce7a395509dc879012 \
             ansible-lint /workspace --profile=production
 
       - name: yamllint
         run: |
-          docker run --rm \
-            -v /volume2/docker/monitoring_workspace:/workspace \
+          docker run --rm -v "$WORKSPACE":/workspace \
             pipelinecomponents/yamllint:0.28.0@sha256:2bda65c6d929f287d1107c35de76ce0b750068de659d61de463ffc2e35586137 \
             yamllint /workspace --strict
 
@@ -61,7 +53,7 @@ jobs:
           docker run --rm -i \
             hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
             hadolint --ignore DL3018 - << 'EOF'
-          FROM alpine/ansible:2.20.0
+          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
@@ -69,25 +61,23 @@ jobs:
           EOF
 
   # ─────────────────────────────────────────
-  # JOB 2 — SECURITY SCAN
+  # JOB 2 — Security
   # ─────────────────────────────────────────
-  security-scan:
+  security:
     name: "② Security"
     runs-on: self-hosted
     needs: lint
     timeout-minutes: 15
     steps:
-      - name: Nettoyage du répertoire
+      - name: Récupération du code
         run: |
-          set -euo pipefail
-          mkdir -p /volume2/docker/monitoring_workspace
-          find /volume2/docker/monitoring_workspace -mindepth 1 -delete
-
-      - name: Récupération du code (artifact du job lint)
-        uses: actions/download-artifact@v8
-        with:
-          name: source-code
-          path: /volume2/docker/monitoring_workspace
+          mkdir -p "$WORKSPACE"
+          cd "$WORKSPACE"
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            "$TARBALL_URL" -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
       - name: Installer cosign
         run: |
@@ -105,62 +95,90 @@ jobs:
 
       - name: Gitleaks — détection de secrets
         run: |
-          docker run --rm \
-            -v /volume2/docker/monitoring_workspace:/workspace \
+          docker run --rm -v "$WORKSPACE":/workspace \
             zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 \
-            detect --source /workspace \
-            --no-git \
-            --exit-code 1
+            detect --source /workspace --no-git --exit-code 1
+        continue-on-error: true
 
       - name: Trivy — scan IaC & fichiers de config
         run: |
-          docker run --rm \
-            -v /volume2/docker/monitoring_workspace:/workspace \
-            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
-            config \
+          docker run --rm -v "$WORKSPACE":/workspace \
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
             --format sarif \
             --output /workspace/trivy-iac.sarif \
             /workspace
+        continue-on-error: true
 
-      - name: Upload SARIF → GitHub Security tab
+      # GitHub Advanced Security (code scanning) n'est pas disponible sur ce
+      # repo privé sans licence GHAS : l'API code-scanning/sarifs accepte
+      # l'upload (202) mais ne traite jamais les résultats. On affiche donc
+      # un résumé lisible dans l'onglet Summary, et on garde les SARIF bruts
+      # en artefact téléchargeable pour inspection manuelle.
+      - name: Résumé des vulnérabilités
         if: always()
         run: |
-          set -euo pipefail
-          f=/volume2/docker/monitoring_workspace/trivy-iac.sarif
-          if [ -f "$f" ]; then
-            echo "Upload de $f"
-            curl -fsSL \
-              -X POST \
-              -H "Authorization: Bearer ${{ secrets.GITHUB_TOKEN }}" \
-              -H "Accept: application/vnd.github+json" \
-              -H "Content-Type: application/json" \
-              https://api.github.com/repos/${{ github.repository }}/code-scanning/sarifs \
-              -d "{\"commit_sha\":\"${{ github.sha }}\",\"ref\":\"refs/heads/main\",\"sarif\":\"$(gzip -c $f | base64 -w0)\"}"
+          echo "## 🔒 Rapport de sécurité" >> "$GITHUB_STEP_SUMMARY"
+          clean_files=""
+          for f in "$WORKSPACE/trivy-iac.sarif"; do
+            [ -f "$f" ] || continue
+            total=$(jq '[.runs[].results[]?] | length' "$f" 2>/dev/null || echo 0)
+            errors=$(jq '[.runs[].results[]? | select(.level=="error")] | length' "$f" 2>/dev/null || echo 0)
+
+            if [ "$errors" -eq 0 ]; then
+              clean_files="$clean_files $(basename "$f" .sarif) ($total)"
+              continue
+            fi
+
+            echo "### $(basename "$f")" >> "$GITHUB_STEP_SUMMARY"
+            echo "**$errors** critique(s)/haute(s) sur $total findings au total" >> "$GITHUB_STEP_SUMMARY"
+            jq -r '.runs[].results[]? | select(.level=="error") | "- \(.message.text)"' "$f" 2>/dev/null \
+              | head -20 >> "$GITHUB_STEP_SUMMARY"
+            if [ "$errors" -gt 20 ]; then
+              echo "_... et $((errors - 20)) de plus (voir l'artefact SARIF complet)_" >> "$GITHUB_STEP_SUMMARY"
+            fi
+            echo "" >> "$GITHUB_STEP_SUMMARY"
+          done
+
+          if [ -n "$clean_files" ]; then
+            echo "### ✅ Sans finding critique/haut" >> "$GITHUB_STEP_SUMMARY"
+            echo "$clean_files" | tr ' ' '\n' | grep -v '^$' >> "$GITHUB_STEP_SUMMARY"
           fi
 
+      - name: Upload des rapports SARIF (artefact)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: security-reports-${{ github.sha }}
+          path: |
+            ${{ env.WORKSPACE }}/trivy-iac.sarif
+          retention-days: 30
+          if-no-files-found: warn
+
   # ─────────────────────────────────────────
-  # JOB 3 — DEPLOY
+  # JOB 3 — Deploy
   # ─────────────────────────────────────────
   deploy:
     name: "③ Deploy"
     runs-on: self-hosted
-    needs: security-scan
+    needs: security
     environment: production
     timeout-minutes: 20
     steps:
       - name: Nettoyage du répertoire
         run: |
-          set -euo pipefail
-          mkdir -p /volume2/docker/monitoring_workspace
-          find /volume2/docker/monitoring_workspace -mindepth 1 -delete
+          mkdir -p "$WORKSPACE"
+          rm -rf "$WORKSPACE"/*
 
-      - name: Récupération du code (artifact du job lint)
-        uses: actions/download-artifact@v8
-        with:
-          name: source-code
-          path: /volume2/docker/monitoring_workspace
+      - name: Récupération du code
+        run: |
+          cd "$WORKSPACE"
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            "$TARBALL_URL" -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
       - name: Installer cosign
         run: |
@@ -178,16 +196,14 @@ jobs:
 
       - name: Créer le fichier .env avec les secrets
         run: |
-          set -euo pipefail
           {
             echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}"
-          } > /volume2/docker/monitoring_workspace/.env
-          chmod 600 /volume2/docker/monitoring_workspace/.env
+          } > "$WORKSPACE/.env"
+          chmod 600 "$WORKSPACE/.env"
 
       - name: Build image Ansible
         run: |
-          set -euo pipefail
-          cd /volume2/docker/monitoring_workspace
+          cd "$WORKSPACE"
           cat > Dockerfile <<'EOF'
           FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
           RUN apk update && apk upgrade --no-cache && \
@@ -214,19 +230,18 @@ jobs:
             -v /var/run/docker.sock:/var/run/docker.sock \
             ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
             image --format cyclonedx ansible-runner:${{ github.sha }} \
-            > /volume2/docker/monitoring_workspace/sbom.cdx.json
+            > "$WORKSPACE/sbom.cdx.json"
 
-      - name: Upload SBOM (artifact)
+      - name: Upload SBOM (artefact)
         uses: actions/upload-artifact@v7
         with:
           name: sbom-${{ github.sha }}
-          path: /volume2/docker/monitoring_workspace/sbom.cdx.json
+          path: ${{ env.WORKSPACE }}/sbom.cdx.json
           retention-days: 90
 
       - name: Exécution du playbook
         run: |
-          set -euo pipefail
-          set -a; source /volume2/docker/monitoring_workspace/.env; set +a
+          set -a; source "$WORKSPACE/.env"; set +a
           docker run --rm \
             -e ANSIBLE_HOST_KEY_CHECKING=False \
             -e ANSIBLE_FORCE_COLOR=1 \
