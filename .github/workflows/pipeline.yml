@@ -125,8 +125,10 @@ jobs:
           clean_files=""
           for f in "$WORKSPACE/trivy-iac.sarif"; do
             [ -f "$f" ] || continue
-            total=$(jq '[.runs[].results[]?] | length' "$f" 2>/dev/null || echo 0)
-            errors=$(jq '[.runs[].results[]? | select(.level=="error")] | length' "$f" 2>/dev/null || echo 0)
+            total=$(jq '[.runs[].results[]?] | length' "$f" 2>/dev/null)
+            errors=$(jq '[.runs[].results[]? | select(.level=="error")] | length' "$f" 2>/dev/null)
+            total="${total:-0}"
+            errors="${errors:-0}"
 
             if [ "$errors" -eq 0 ]; then
               clean_files="$clean_files $(basename "$f" .sarif) ($total)"
