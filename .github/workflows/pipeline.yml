@@ -89,6 +89,20 @@ jobs:
           name: source-code
           path: /volume2/docker/monitoring_workspace
 
+      - name: Installer cosign
+        run: |
+          curl -sSL -o /usr/local/bin/cosign \
+            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x /usr/local/bin/cosign
+          cosign version
+
+      - name: Cosign — vérification image Trivy
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            ghcr.io/aquasecurity/trivy:0.73.0
+
       - name: Gitleaks — détection de secrets
         run: |
           docker run --rm \
@@ -111,7 +125,7 @@ jobs:
               --config p/yaml \
               --config p/github-actions \
               --sarif --output=/workspace/semgrep.sarif \
-              --error || true
+              --error
 
       - name: Trivy — scan IaC & fichiers de config
         run: |
@@ -164,6 +178,20 @@ jobs:
           name: source-code
           path: /volume2/docker/monitoring_workspace
 
+      - name: Installer cosign
+        run: |
+          curl -sSL -o /usr/local/bin/cosign \
+            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
+          chmod +x /usr/local/bin/cosign
+          cosign version
+
+      - name: Cosign — vérification image Trivy
+        run: |
+          cosign verify \
+            --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            ghcr.io/aquasecurity/trivy:0.73.0
+
       - name: Créer le fichier .env avec les secrets
         run: |
           set -euo pipefail
@@ -192,7 +220,7 @@ jobs:
             ghcr.io/aquasecurity/trivy:0.73.0 \
             image \
             --exit-code 1 \
-            --severity CRITICAL \
+            --severity HIGH,CRITICAL \
             --ignore-unfixed \
             ansible-runner:${{ github.sha }}
 
