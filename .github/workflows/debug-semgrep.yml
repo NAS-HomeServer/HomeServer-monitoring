@@ -9,33 +9,30 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Nettoyage complet
-        run: |
-          rm -rf /volume2/docker/monitoring_workspace
-          mkdir -p /volume2/docker/monitoring_workspace
-
-      - name: Espace disque
-        run: df -h /volume2
-
-      - name: Recuperation du code propre
-        run: |
-          set -euo pipefail
-          cd /volume2/docker/monitoring_workspace
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            https://api.github.com/repos/NAS-HomeServer/HomeServer-monitoring/tarball/main \
-            -o repo.tar.gz
-          tar -xzf repo.tar.gz --strip-components=1
-          rm repo.tar.gz
-          echo "Contenu du repo:"
-          find . -type f | head -50
-          echo "Taille totale:"
-          du -sh .
-
-      - name: Semgrep sur repertoire propre
+      - name: Version semgrep
         run: |
           docker run --rm \
-            -v /volume2/docker/monitoring_workspace:/workspace \
-            -w /workspace \
+            --entrypoint sh \
             semgrep/semgrep:1.95.0 \
-            sh -c "semgrep scan --config p/ci --debug 2>&1; echo EXIT:\$?"
+            -c "semgrep --version"
+
+      - name: Test avec URL complete au lieu du raccourci
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            semgrep/semgrep:1.95.0 \
+            -c "mkdir -p /tmp/src && echo 'print(1)' > /tmp/src/a.py && cd /tmp/src && semgrep scan --config https://semgrep.dev/c/p/ci --debug 2>&1; echo EXIT:\$?"
+
+      - name: Test avec metrics off explicite
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            semgrep/semgrep:1.95.0 \
+            -c "mkdir -p /tmp/src2 && echo 'print(1)' > /tmp/src2/a.py && cd /tmp/src2 && semgrep scan --config p/ci --metrics=off --debug 2>&1; echo EXIT:\$?"
+
+      - name: Test avec pack differencie
+        run: |
+          docker run --rm \
+            --entrypoint sh \
+            semgrep/semgrep:1.95.0 \
+            -c "mkdir -p /tmp/src3 && echo 'print(1)' > /tmp/src3/a.py && cd /tmp/src3 && semgrep scan --config r/python.lang.correctness --debug 2>&1; echo EXIT:\$?"
