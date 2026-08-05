@@ -9,14 +9,14 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Debug réseau Semgrep
+      - name: Debug reseau Semgrep
         run: |
           docker run --rm \
             --entrypoint sh \
             semgrep/semgrep:1.95.0 \
             -c "wget -qO- --timeout=10 -S https://semgrep.dev/ 2>&1 | head -20; echo EXIT:\$?"
 
-      - name: Semgrep — SAST (full debug)
+      - name: Semgrep SAST full debug
         run: |
           docker run --rm \
             --entrypoint sh \
