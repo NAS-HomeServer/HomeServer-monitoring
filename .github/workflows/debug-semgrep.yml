@@ -21,4 +21,4 @@ jobs:
           docker run --rm \
             --entrypoint sh \
             semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /workspace && cd /workspace && semgrep scan --config p/ci --debug 2>&1 | tail -60"
+            -c "mkdir -p /workspace && cd /workspace && semgrep scan --config p/ci --debug > /tmp/semgrep.log 2>&1; echo EXIT:\$?; cat /tmp/semgrep.log"
