@@ -55,6 +55,11 @@
       "matchUpdateTypes": ["digest"],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "cAdvisor : bloqué <0.50.0 (incompatibilité containerd/DSM Synology, cf. incident août 2026)",
+      "matchPackageNames": ["gcr.io/cadvisor/cadvisor"],
+      "allowedVersions": "<0.50.0"
     }
   ]
 }
