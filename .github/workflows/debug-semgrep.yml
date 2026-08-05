@@ -9,16 +9,30 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Test endpoint registry reel
+      - name: Recuperation du code
         run: |
-          docker run --rm \
-            --entrypoint sh \
-            semgrep/semgrep:1.95.0 \
-            -c "wget -qO- -S --timeout=10 https://semgrep.dev/c/p/ci 2>&1 | head -30; echo EXIT:\$?"
+          set -euo pipefail
+          mkdir -p /volume2/docker/monitoring_workspace
+          cd /volume2/docker/monitoring_workspace
+          curl -f -L \
+            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
+            https://api.github.com/repos/NAS-HomeServer/HomeServer-monitoring/tarball/main \
+            -o repo.tar.gz
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
 
-      - name: Semgrep avec config local minimal
+      - name: Semgrep p ci seul sur vrai repo
         run: |
           docker run --rm \
-            --entrypoint sh \
+            -v /volume2/docker/monitoring_workspace:/workspace \
+            -w /workspace \
             semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /tmp/rules && printf 'rules:\n  - id: test-rule\n    pattern: print(...)\n    message: test\n    languages: [python]\n    severity: WARNING\n' > /tmp/rules/test.yml && mkdir -p /tmp/src && echo 'print(1)' > /tmp/src/a.py && semgrep scan --config /tmp/rules/test.yml /tmp/src --debug > /tmp/log.txt 2>&1; echo EXIT:\$?; cat /tmp/log.txt"
+            sh -c "semgrep scan --config p/ci --debug > /tmp/log.txt 2>&1; echo EXIT:\$?; cat /tmp/log.txt"
+
+      - name: Semgrep 5 configs sur vrai repo
+        run: |
+          docker run --rm \
+            -v /volume2/docker/monitoring_workspace:/workspace \
+            -w /workspace \
+            semgrep/semgrep:1.95.0 \
+            sh -c "semgrep scan --config p/ci --config p/security-audit --config p/dockerfile --config p/yaml --config p/github-actions --debug > /tmp/log2.txt 2>&1; echo EXIT:\$?; cat /tmp/log2.txt"
