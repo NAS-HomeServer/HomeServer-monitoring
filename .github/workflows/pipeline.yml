@@ -102,7 +102,7 @@ jobs:
 
       - name: Trivy — scan IaC & fichiers de config
         run: |
-          docker run --rm -v "$WORKSPACE":/workspace \
+          docker run --rm --user "$(id -u):$(id -g)" -v "$WORKSPACE":/workspace \
             ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
@@ -150,7 +150,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: security-reports-${{ github.sha }}
+          name: trivy-security-report
           path: |
             ${{ env.WORKSPACE }}/trivy-iac.sarif
           retention-days: 30
@@ -235,7 +235,7 @@ jobs:
       - name: Upload SBOM (artefact)
         uses: actions/upload-artifact@v7
         with:
-          name: sbom-${{ github.sha }}
+          name: sbom-cyclonedx
           path: ${{ env.WORKSPACE }}/sbom.cdx.json
           retention-days: 90
 
