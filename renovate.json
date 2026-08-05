@@ -18,6 +18,16 @@
     "labels": ["security"]
   },
   "osvVulnerabilityAlerts": true,
+  "regexManagers": [
+    {
+      "description": "Images pinnees par digest dans les workflows GitHub Actions (docker run inline)",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "matchStrings": [
+        "(?<depName>[a-zA-Z0-9./_-]+):(?<currentValue>[a-zA-Z0-9._-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
+      ],
+      "datasourceTemplate": "docker"
+    }
+  ],
   "packageRules": [
     {
       "description": "Docker-compose : pas d'automerge, review manuelle",
@@ -51,10 +61,17 @@
     },
     {
       "description": "Digest pinning docker images : automerge silencieux",
-      "matchManagers": ["docker-compose"],
+      "matchManagers": ["docker-compose", "regex"],
       "matchUpdateTypes": ["digest"],
       "automerge": true,
       "automergeType": "pr"
+    },
+    {
+      "description": "Digests inline workflows : review manuelle si changement de tag/version (pas juste digest)",
+      "matchManagers": ["regex"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "automerge": false,
+      "labels": ["ci", "digest-pin"]
     },
     {
       "description": "cAdvisor : bloqué <0.50.0 (incompatibilité containerd/DSM Synology, cf. incident août 2026)",
