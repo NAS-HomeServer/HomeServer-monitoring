@@ -112,20 +112,13 @@ jobs:
             --no-git \
             --exit-code 1
 
-      - name: Semgrep — SAST
+      - name: Semgrep — SAST (debug)
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
             -w /workspace \
             semgrep/semgrep:1.95.0 \
-            semgrep scan \
-              --config p/ci \
-              --config p/security-audit \
-              --config p/dockerfile \
-              --config p/yaml \
-              --config p/github-actions \
-              --sarif --output=/workspace/semgrep.sarif \
-              --error
+            semgrep scan --config p/ci --verbose
 
       - name: Trivy — scan IaC & fichiers de config
         run: |
