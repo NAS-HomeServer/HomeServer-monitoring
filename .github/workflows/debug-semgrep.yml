@@ -9,30 +9,18 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Version semgrep
+      - name: Telecharger les regles en local
         run: |
-          docker run --rm \
-            --entrypoint sh \
-            semgrep/semgrep:1.95.0 \
-            -c "semgrep --version"
+          mkdir -p /tmp/semgrep-rules
+          curl -fsSL https://semgrep.dev/c/p/ci -o /tmp/semgrep-rules/ci.yml
+          curl -fsSL https://semgrep.dev/c/p/security-audit -o /tmp/semgrep-rules/security-audit.yml
+          echo "Taille des fichiers telecharges:"
+          ls -lh /tmp/semgrep-rules/
 
-      - name: Test avec URL complete au lieu du raccourci
+      - name: Semgrep avec regles locales telechargees
         run: |
           docker run --rm \
+            -v /tmp/semgrep-rules:/rules \
             --entrypoint sh \
             semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /tmp/src && echo 'print(1)' > /tmp/src/a.py && cd /tmp/src && semgrep scan --config https://semgrep.dev/c/p/ci --debug 2>&1; echo EXIT:\$?"
-
-      - name: Test avec metrics off explicite
-        run: |
-          docker run --rm \
-            --entrypoint sh \
-            semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /tmp/src2 && echo 'print(1)' > /tmp/src2/a.py && cd /tmp/src2 && semgrep scan --config p/ci --metrics=off --debug 2>&1; echo EXIT:\$?"
-
-      - name: Test avec pack differencie
-        run: |
-          docker run --rm \
-            --entrypoint sh \
-            semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /tmp/src3 && echo 'print(1)' > /tmp/src3/a.py && cd /tmp/src3 && semgrep scan --config r/python.lang.correctness --debug 2>&1; echo EXIT:\$?"
+            -c "mkdir -p /tmp/src && echo 'print(1)' > /tmp/src/a.py && cd /tmp/src && semgrep scan --config /rules/ci.yml --config /rules/security-audit.yml --debug 2>&1; echo EXIT:\$?"
