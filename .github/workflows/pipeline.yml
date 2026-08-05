@@ -112,14 +112,6 @@ jobs:
             --no-git \
             --exit-code 1
 
-      - name: Debug réseau Semgrep
-        run: |
-          docker run --rm \
-            --dns 192.168.1.200 \
-            --entrypoint sh \
-            semgrep/semgrep:1.95.0 \
-            -c "wget -qO- --timeout=5 https://semgrep.dev/api/registry/health; echo EXIT:\$?"
-
       - name: Trivy — scan IaC & fichiers de config
         run: |
           docker run --rm \
@@ -136,9 +128,8 @@ jobs:
         if: always()
         run: |
           set -euo pipefail
-          for f in /volume2/docker/monitoring_workspace/semgrep.sarif \
-                   /volume2/docker/monitoring_workspace/trivy-iac.sarif; do
-            [ -f "$f" ] || continue
+          f=/volume2/docker/monitoring_workspace/trivy-iac.sarif
+          if [ -f "$f" ]; then
             echo "Upload de $f"
             curl -fsSL \
               -X POST \
@@ -147,7 +138,7 @@ jobs:
               -H "Content-Type: application/json" \
               https://api.github.com/repos/${{ github.repository }}/code-scanning/sarifs \
               -d "{\"commit_sha\":\"${{ github.sha }}\",\"ref\":\"refs/heads/main\",\"sarif\":\"$(gzip -c $f | base64 -w0)\"}"
-          done
+          fi
 
   # ─────────────────────────────────────────
   # JOB 3 — DEPLOY
