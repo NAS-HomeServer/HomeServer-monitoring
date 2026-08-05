@@ -46,21 +46,21 @@ jobs:
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
-            pipelinecomponents/ansible-lint:latest \
+            pipelinecomponents/ansible-lint:0.58.0@sha256:937b425d2f0a80f560b5d393af17840b7989e31b1b231dce7a395509dc879012 \
             ansible-lint /workspace --profile=production
 
       - name: yamllint
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
-            pipelinecomponents/yamllint:latest \
+            pipelinecomponents/yamllint:0.28.0@sha256:2bda65c6d929f287d1107c35de76ce0b750068de659d61de463ffc2e35586137 \
             yamllint /workspace --strict
 
       - name: hadolint (Dockerfile lint)
         run: |
-          docker run --rm -i hadolint/hadolint:latest hadolint \
-            --ignore DL3018 \
-            - << 'EOF'
+          docker run --rm -i \
+            hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+            hadolint --ignore DL3018 - << 'EOF'
           FROM alpine/ansible:2.20.0
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
@@ -101,13 +101,13 @@ jobs:
           cosign verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            ghcr.io/aquasecurity/trivy:0.73.0
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
 
       - name: Gitleaks — détection de secrets
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
-            zricethezav/gitleaks:latest \
+            zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 \
             detect --source /workspace \
             --no-git \
             --exit-code 1
@@ -116,7 +116,7 @@ jobs:
         run: |
           docker run --rm \
             -v /volume2/docker/monitoring_workspace:/workspace \
-            ghcr.io/aquasecurity/trivy:0.73.0 \
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
             config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
@@ -174,7 +174,7 @@ jobs:
           cosign verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            ghcr.io/aquasecurity/trivy:0.73.0
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c
 
       - name: Créer le fichier .env avec les secrets
         run: |
@@ -189,7 +189,7 @@ jobs:
           set -euo pipefail
           cd /volume2/docker/monitoring_workspace
           cat > Dockerfile <<'EOF'
-          FROM alpine/ansible:2.20.0
+          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
@@ -201,7 +201,7 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/aquasecurity/trivy:0.73.0 \
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
             image \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
@@ -212,7 +212,7 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/aquasecurity/trivy:0.73.0 \
+            ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
             image --format cyclonedx ansible-runner:${{ github.sha }} \
             > /volume2/docker/monitoring_workspace/sbom.cdx.json
 
