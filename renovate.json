@@ -18,8 +18,9 @@
     "labels": ["security"]
   },
   "osvVulnerabilityAlerts": true,
-  "regexManagers": [
+  "customManagers": [
     {
+      "customType": "regex",
       "description": "Images pinnees par digest dans les workflows GitHub Actions (docker run inline)",
       "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
       "matchStrings": [
@@ -60,15 +61,22 @@
       "labels": ["ansible", "dependencies"]
     },
     {
-      "description": "Digest pinning docker images : automerge silencieux",
-      "matchManagers": ["docker-compose", "regex"],
+      "description": "Digest pinning docker-compose : automerge silencieux",
+      "matchManagers": ["docker-compose"],
       "matchUpdateTypes": ["digest"],
       "automerge": true,
       "automergeType": "pr"
     },
     {
-      "description": "Digests inline workflows : review manuelle si changement de tag/version (pas juste digest)",
-      "matchManagers": ["regex"],
+      "description": "Digest pinning inline workflows : automerge silencieux si digest seul",
+      "matchManagers": ["custom.regex"],
+      "matchUpdateTypes": ["digest"],
+      "automerge": true,
+      "automergeType": "pr"
+    },
+    {
+      "description": "Digests inline workflows : review manuelle si changement de tag/version",
+      "matchManagers": ["custom.regex"],
       "matchUpdateTypes": ["major", "minor", "patch"],
       "automerge": false,
       "labels": ["ci", "digest-pin"]
