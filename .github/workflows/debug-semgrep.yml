@@ -9,16 +9,16 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Debug reseau Semgrep
+      - name: Test endpoint registry reel
         run: |
           docker run --rm \
             --entrypoint sh \
             semgrep/semgrep:1.95.0 \
-            -c "wget -qO- --timeout=10 -S https://semgrep.dev/ 2>&1 | head -20; echo EXIT:\$?"
+            -c "wget -qO- -S --timeout=10 https://semgrep.dev/c/p/ci 2>&1 | head -30; echo EXIT:\$?"
 
-      - name: Semgrep SAST full debug
+      - name: Semgrep avec config local minimal
         run: |
           docker run --rm \
             --entrypoint sh \
             semgrep/semgrep:1.95.0 \
-            -c "mkdir -p /workspace && cd /workspace && semgrep scan --config p/ci --debug > /tmp/semgrep.log 2>&1; echo EXIT:\$?; cat /tmp/semgrep.log"
+            -c "mkdir -p /tmp/rules && printf 'rules:\n  - id: test-rule\n    pattern: print(...)\n    message: test\n    languages: [python]\n    severity: WARNING\n' > /tmp/rules/test.yml && mkdir -p /tmp/src && echo 'print(1)' > /tmp/src/a.py && semgrep scan --config /tmp/rules/test.yml /tmp/src --debug > /tmp/log.txt 2>&1; echo EXIT:\$?; cat /tmp/log.txt"
