@@ -39,7 +39,7 @@ jobs:
       - name: ansible-lint
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
-            pipelinecomponents/ansible-lint:0.58.0@sha256:937b425d2f0a80f560b5d393af17840b7989e31b1b231dce7a395509dc879012 \
+            pipelinecomponents/ansible-lint:0.79.38@sha256:1c4d2abd372a2dce7ea1cb8e27b650db809115d410a87a4aba2438bd028de735 \
             ansible-lint /workspace --profile=production
 
       - name: yamllint
