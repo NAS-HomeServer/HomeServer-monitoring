@@ -217,24 +217,31 @@ jobs:
           EOF
           docker build -t ansible-runner:${{ github.sha }} .
 
+      # Export tar via `docker save` : la commande s'exécute directement sur
+      # le démon du runner (docker-cli déjà installé), sans qu'aucun conteneur
+      # n'ait besoin du socket monté. Trivy scanne ensuite le tar en entrée.
+      - name: Export image pour scan
+        run: docker save ansible-runner:${{ github.sha }} -o "$WORKSPACE/image.tar"
+
       - name: Trivy — scan image construite
         run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
+          docker run --rm -v "$WORKSPACE":/workspace \
             ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
-            image \
+            image --input /workspace/image.tar \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
-            --ignore-unfixed \
-            ansible-runner:${{ github.sha }}
+            --ignore-unfixed
 
       - name: Trivy — génération SBOM (CycloneDX)
         run: |
-          docker run --rm \
-            -v /var/run/docker.sock:/var/run/docker.sock \
+          docker run --rm -v "$WORKSPACE":/workspace \
             ghcr.io/aquasecurity/trivy:0.73.0@sha256:7cced7cae583819fc7806d4cbc0dbbc7cad18b99f7d3e235192e6da8c091045c \
-            image --format cyclonedx ansible-runner:${{ github.sha }} \
+            image --input /workspace/image.tar --format cyclonedx \
             > "$WORKSPACE/sbom.cdx.json"
+
+      - name: Nettoyage tar image
+        if: always()
+        run: rm -f "$WORKSPACE/image.tar"
 
       - name: Upload SBOM (artefact)
         uses: actions/upload-artifact@v7
@@ -243,20 +250,37 @@ jobs:
           path: ${{ env.WORKSPACE }}/sbom.cdx.json
           retention-days: 90
 
+      - name: Créer réseau CI temporaire
+        run: docker network create "ci-deploy-net-${{ github.run_id }}"
+
+      - name: Démarrer docker-socket-proxy
+        run: |
+          docker run -d --name "socket-proxy-${{ github.run_id }}" \
+            --network "ci-deploy-net-${{ github.run_id }}" \
+            -v /var/run/docker.sock:/var/run/docker.sock:ro \
+            -e CONTAINERS=1 -e IMAGES=1 -e NETWORKS=1 -e VOLUMES=1 -e POST=1 \
+            -e EXEC=0 -e SWARM=0 -e SECRETS=0 -e NODES=0 -e PLUGINS=0 -e SYSTEM=0 \
+            tecnativa/docker-socket-proxy:v0.5.0@sha256:1f5038b54f06c3e18422902cf00ba21803d1c97805aae032e5e6673d532d3459
+
       - name: Exécution du playbook
         run: |
           set -a; source "$WORKSPACE/.env"; set +a
           docker run --rm \
-            -e ANSIBLE_HOST_KEY_CHECKING=False \
+            --network "ci-deploy-net-${{ github.run_id }}" \
             -e ANSIBLE_FORCE_COLOR=1 \
-            -e DOCKER_API_VERSION=1.43 \
-            -v /var/run/docker.sock:/var/run/docker.sock \
+            -e DOCKER_HOST="tcp://socket-proxy-${{ github.run_id }}:2375" \
             -v /volume2/docker:/volume2/docker \
             ansible-runner:${{ github.sha }} \
             ansible-playbook \
               -i ansible/inventory/hosts.ini \
               ansible/playbooks/deploy-monitoring.yml \
               --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}"
+
+      - name: Cleanup socket-proxy & réseau
+        if: always()
+        run: |
+          docker rm -f "socket-proxy-${{ github.run_id }}" || true
+          docker network rm "ci-deploy-net-${{ github.run_id }}" || true
 
       - name: Cleanup image
         if: always()
