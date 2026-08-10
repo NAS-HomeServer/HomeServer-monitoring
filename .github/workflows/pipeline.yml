@@ -39,21 +39,21 @@ jobs:
       - name: ansible-lint
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
-            pipelinecomponents/ansible-lint:0.58.0@sha256:937b425d2f0a80f560b5d393af17840b7989e31b1b231dce7a395509dc879012 \
+            pipelinecomponents/ansible-lint:0.79.38@sha256:1c4d2abd372a2dce7ea1cb8e27b650db809115d410a87a4aba2438bd028de735 \
             ansible-lint /workspace --profile=production
 
       - name: yamllint
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
-            pipelinecomponents/yamllint:0.28.0@sha256:2bda65c6d929f287d1107c35de76ce0b750068de659d61de463ffc2e35586137 \
+            pipelinecomponents/yamllint:0.35.13@sha256:5ab5eb7da0ed5e606b07c1723fc8b275e925189f70ac259b26b7329cb5f8f44d \
             yamllint /workspace --strict
 
       - name: hadolint (Dockerfile lint)
         run: |
           docker run --rm -i \
-            hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+            hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
             hadolint --ignore DL3018 - << 'EOF'
-          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
+          FROM alpine/ansible:2.21.0@sha256:72091a94468aabc24f3741a5de4f2b1c789d80e2f98634a95551008335ccb81a
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
@@ -96,7 +96,7 @@ jobs:
       - name: Gitleaks — détection de secrets
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
-            zricethezav/gitleaks:v8.21.2@sha256:0e99e8821643ea5b235718642b93bb32486af9c8162c8b8731f7cbdc951a7f46 \
+            zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
             detect --source /workspace --no-git --exit-code 1
         continue-on-error: true
 
@@ -209,7 +209,7 @@ jobs:
         run: |
           cd "$WORKSPACE"
           cat > Dockerfile <<'EOF'
-          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
+          FROM alpine/ansible:2.21.0@sha256:72091a94468aabc24f3741a5de4f2b1c789d80e2f98634a95551008335ccb81a
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
