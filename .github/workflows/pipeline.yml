@@ -221,7 +221,7 @@ jobs:
       # le démon du runner (docker-cli déjà installé), sans qu'aucun conteneur
       # n'ait besoin du socket monté. Trivy scanne ensuite le tar en entrée.
       - name: Export image pour scan
-        run: docker save ansible-runner:${{ github.sha }} -o "$WORKSPACE/image.tar"
+        run: docker save ansible-runner:${{ github.sha }} > "$WORKSPACE/image.tar"
 
       - name: Trivy — scan image construite
         run: |
