@@ -100,6 +100,16 @@ jobs:
             detect --source /workspace --no-git --exit-code 1
         continue-on-error: true
 
+      # Trivy `config` : scanner de mauvaises configurations IaC (Dockerfile,
+      # docker-compose, YAML Ansible/Kubernetes, Terraform...). Ne couvre PAS
+      # les vulnérabilités de dépendances (ce serait `trivy fs`) ni les
+      # secrets (couvert par Gitleaks ci-dessus).
+      #
+      # Pas de continue-on-error ici : --exit-code 1 doit faire échouer ce
+      # step (et donc bloquer deploy via needs: security) en cas de finding
+      # HIGH/CRITICAL réel. Les deux steps suivants restent en if: always()
+      # pour produire quand même le résumé et l'artefact SARIF même en cas
+      # d'échec de ce step.
       - name: Trivy — scan IaC & fichiers de config
         run: |
           touch "$WORKSPACE/trivy-iac.sarif"
@@ -111,7 +121,6 @@ jobs:
             --format sarif \
             --output /workspace/trivy-iac.sarif \
             /workspace
-        continue-on-error: true
 
       # GitHub Advanced Security (code scanning) n'est pas disponible sur ce
       # repo privé sans licence GHAS : l'API code-scanning/sarifs accepte
