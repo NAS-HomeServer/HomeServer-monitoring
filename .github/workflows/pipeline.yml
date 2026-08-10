@@ -53,7 +53,7 @@ jobs:
           docker run --rm -i \
             hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
             hadolint --ignore DL3018 - << 'EOF'
-          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
+          FROM alpine/ansible:2.21.0@sha256:72091a94468aabc24f3741a5de4f2b1c789d80e2f98634a95551008335ccb81a
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
@@ -209,7 +209,7 @@ jobs:
         run: |
           cd "$WORKSPACE"
           cat > Dockerfile <<'EOF'
-          FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
+          FROM alpine/ansible:2.21.0@sha256:72091a94468aabc24f3741a5de4f2b1c789d80e2f98634a95551008335ccb81a
           RUN apk update && apk upgrade --no-cache && \
               apk add --no-cache docker-cli docker-cli-compose
           COPY . /app
