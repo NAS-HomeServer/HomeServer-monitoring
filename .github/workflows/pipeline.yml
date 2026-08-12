@@ -51,7 +51,7 @@ jobs:
       - name: hadolint (Dockerfile lint)
         run: |
           docker run --rm -i \
-            hadolint/hadolint:v2.12.0@sha256:30a8fd2e785ab6176eed53f74769e04f125afb2f74a6c52aef7d463583b6d45e \
+            hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
             hadolint --ignore DL3018 - << 'EOF'
           FROM alpine/ansible:2.20.0@sha256:0a4a5b8808ed81a386d0acb04743de9c377a01cfb27580c54b1c8ee79da57e96
           RUN apk update && apk upgrade --no-cache && \
