@@ -224,7 +224,7 @@ jobs:
           COPY . /app
           WORKDIR /app
           EOF
-          docker build -t ansible-runner:${{ github.sha }} .
+          docker build --no-cache -t ansible-runner:${{ github.sha }} .
 
       - name: Trivy — scan image construite
         run: |
