@@ -101,6 +101,14 @@ jobs:
       # les vulnérabilités de dépendances (ce serait `trivy fs`) ni les
       # secrets (couvert par Gitleaks ci-dessus).
       #
+      # /dev/stdout à l'intérieur du conteneur pointe vers un pipe non
+      # seekable : Trivy fait un open()+truncate() sur le chemin de sortie,
+      # et truncate() échoue silencieusement sur le bind mount (remapping
+      # UID Container Manager Synology) → sortie vide malgré le touch/chmod.
+      # Solution : écrire dans le filesystem interne du conteneur (pas de
+      # volume), puis extraire via `docker cp`, qui passe par l'API du
+      # daemon Docker et gère correctement le remapping.
+      #
       # Pas de continue-on-error ici : --exit-code 1 doit faire échouer ce
       # step (et donc bloquer deploy via needs: security) en cas de finding
       # HIGH/CRITICAL réel. Les deux steps suivants restent en if: always()
@@ -108,15 +116,21 @@ jobs:
       # d'échec de ce step.
       - name: Trivy — scan IaC & fichiers de config
         run: |
-          touch "$WORKSPACE/trivy-iac.sarif"
-          chmod 666 "$WORKSPACE/trivy-iac.sarif"
-          docker run --rm -v "$WORKSPACE":/workspace \
+          set +e
+          CID="trivy-iac-${{ github.run_id }}-${{ github.run_attempt }}"
+          docker run --name "$CID" \
+            -v "$WORKSPACE":/workspace \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
             --format sarif \
-            --output /workspace/trivy-iac.sarif \
+            --output /tmp/trivy-iac.sarif \
             /workspace
+          SCAN_EXIT=$?
+          docker cp "$CID":/tmp/trivy-iac.sarif "$WORKSPACE/trivy-iac.sarif"
+          docker rm "$CID" > /dev/null
+          set -e
+          exit $SCAN_EXIT
 
       # Vérification post-écriture : on échoue explicitement si le SARIF
       # est vide, plutôt que de laisser passer un faux "0 finding" silencieux.
