@@ -118,6 +118,13 @@ jobs:
             --output /workspace/trivy-iac.sarif \
             /workspace
 
+      # Vérification post-écriture : on échoue explicitement si le SARIF
+      # est vide, plutôt que de laisser passer un faux "0 finding" silencieux.
+      - name: Vérifier que le rapport n'est pas vide
+        if: always()
+        run: |
+          [ -s "$WORKSPACE/trivy-iac.sarif" ] || { echo "::error::trivy-iac.sarif est vide (0 octet) — l'écriture du rapport a échoué"; exit 1; }
+
       # GitHub Advanced Security (code scanning) n'est pas disponible sur ce
       # repo privé sans licence GHAS : l'API code-scanning/sarifs accepte
       # l'upload (202) mais ne traite jamais les résultats. On affiche donc
@@ -225,6 +232,10 @@ jobs:
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
             image --format cyclonedx ansible-runner:${{ github.sha }} \
             > "$WORKSPACE/sbom.cdx.json"
+
+      - name: Vérifier que le SBOM n'est pas vide
+        run: |
+          [ -s "$WORKSPACE/sbom.cdx.json" ] || { echo "::error::sbom.cdx.json est vide (0 octet) — l'écriture du rapport a échoué"; exit 1; }
 
       - name: Upload SBOM (artefact)
         uses: actions/upload-artifact@v7
