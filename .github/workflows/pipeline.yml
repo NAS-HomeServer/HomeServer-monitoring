@@ -160,7 +160,7 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: trivy-security-report
+          name: trivy-iac-report-sarif
           path: |
             ${{ env.WORKSPACE }}/trivy-iac.sarif
           retention-days: 30
@@ -230,7 +230,7 @@ jobs:
       - name: Upload SBOM (artefact)
         uses: actions/upload-artifact@v7
         with:
-          name: sbom-cyclonedx
+          name: sbom-cyclonedx-json
           path: ${{ env.WORKSPACE }}/sbom.cdx.json
           retention-days: 90
 
