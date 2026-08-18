@@ -167,14 +167,13 @@ jobs:
           if-no-files-found: warn
 
   # ─────────────────────────────────────────
-  # JOB 3 — Deploy
+  # JOB 3 — Build & Scan
   # ─────────────────────────────────────────
-  deploy:
-    name: "③ Deploy"
+  build-scan:
+    name: "③ Build & Scan"
     runs-on: self-hosted
     needs: security
-    environment: production
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Nettoyage du répertoire
         run: |
@@ -196,13 +195,6 @@ jobs:
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
-
-      - name: Créer le fichier .env avec les secrets
-        run: |
-          {
-            echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}"
-          } > "$WORKSPACE/.env"
-          chmod 600 "$WORKSPACE/.env"
 
       - name: Build image Ansible
         run: |
@@ -242,6 +234,35 @@ jobs:
           path: ${{ env.WORKSPACE }}/sbom.cdx.json
           retention-days: 90
 
+      # Le job deploy réutilise cette image via son tag (même runner, même
+      # démon Docker) — si un step échoue avant la fin de ce job, personne
+      # d'autre ne la nettoiera, donc on s'en charge ici.
+      - name: Cleanup en cas d'échec
+        if: failure()
+        run: docker rmi ansible-runner:${{ github.sha }} || true
+
+  # ─────────────────────────────────────────
+  # JOB 4 — Deploy
+  # ─────────────────────────────────────────
+  deploy:
+    name: "④ Deploy"
+    runs-on: self-hosted
+    needs: build-scan
+    environment: production
+    timeout-minutes: 10
+    steps:
+      # Secret de déploiement (pas de build) : créé ici, dans le seul job
+      # sous le gate environment: production.
+      - name: Créer le fichier .env avec les secrets
+        run: |
+          mkdir -p "$WORKSPACE"
+          {
+            echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}"
+          } > "$WORKSPACE/.env"
+          chmod 600 "$WORKSPACE/.env"
+
+      # Image ansible-runner:${{ github.sha }} déjà construite et scannée
+      # par le job build-scan (même runner self-hosted, pas de re-build).
       - name: Exécution du playbook
         run: |
           set -a; source "$WORKSPACE/.env"; set +a
