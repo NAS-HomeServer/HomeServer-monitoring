@@ -14,6 +14,7 @@ concurrency:
 
 env:
   WORKSPACE: /volume2/docker/monitoring_workspace
+  RUNNER_DOCKERFILE: ci/Dockerfile.ansible-runner
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/main
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
 
@@ -53,13 +54,7 @@ jobs:
         run: |
           docker run --rm -i \
             hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
-            hadolint --ignore DL3018 - << 'EOF'
-          FROM alpine/ansible:2.21.0@sha256:9ca4c3d27864fba89c129a849b04df398e9db7a41584b7611fd3decc6dd96bd3
-          RUN apk update && apk upgrade --no-cache && \
-              apk add --no-cache docker-cli docker-cli-compose
-          COPY . /app
-          WORKDIR /app
-          EOF
+            hadolint --ignore DL3018 - < "$WORKSPACE/$RUNNER_DOCKERFILE"
 
   # ─────────────────────────────────────────
   # JOB 2 — Security
@@ -219,14 +214,7 @@ jobs:
       - name: Build image Ansible
         run: |
           cd "$WORKSPACE"
-          cat > Dockerfile <<'EOF'
-          FROM alpine/ansible:2.21.0@sha256:9ca4c3d27864fba89c129a849b04df398e9db7a41584b7611fd3decc6dd96bd3
-          RUN apk update && apk upgrade --no-cache && \
-              apk add --no-cache docker-cli docker-cli-compose
-          COPY . /app
-          WORKDIR /app
-          EOF
-          docker build --no-cache -t ansible-runner:${{ github.sha }} .
+          docker build --no-cache -f "$RUNNER_DOCKERFILE" -t ansible-runner:${{ github.sha }} .
 
       - name: Trivy — scan image construite
         run: |
