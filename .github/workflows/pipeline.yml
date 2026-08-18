@@ -15,6 +15,7 @@ concurrency:
 env:
   WORKSPACE: /volume2/docker/monitoring_workspace
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/main
+  COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
 
 jobs:
 
@@ -79,16 +80,12 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Installer cosign
-        run: |
-          curl -sSL -o /usr/local/bin/cosign \
-            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
-          chmod +x /usr/local/bin/cosign
-          cosign version
-
+      # Image cosign épinglée par digest : évite un `curl | chmod +x` non
+      # vérifié sur un binaire "latest" qui servirait justement à vérifier
+      # l'authenticité des autres images.
       - name: Cosign — vérification image Trivy
         run: |
-          cosign verify \
+          docker run --rm "$COSIGN_IMAGE" verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
@@ -193,16 +190,9 @@ jobs:
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
-      - name: Installer cosign
-        run: |
-          curl -sSL -o /usr/local/bin/cosign \
-            https://github.com/sigstore/cosign/releases/latest/download/cosign-linux-amd64
-          chmod +x /usr/local/bin/cosign
-          cosign version
-
       - name: Cosign — vérification image Trivy
         run: |
-          cosign verify \
+          docker run --rm "$COSIGN_IMAGE" verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
