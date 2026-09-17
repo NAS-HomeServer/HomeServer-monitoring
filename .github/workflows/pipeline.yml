@@ -18,7 +18,7 @@ env:
   RUNNER_DOCKERFILE: ci/Dockerfile.ansible-runner
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
-  ALPINE_IMAGE: alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
+  ALPINE_IMAGE: alpine:3.24@sha256:28bd5fe8b56d1bd048e5babf5b10710ebe0bae67db86916198a6eec434943f8b
 
 jobs:
 
