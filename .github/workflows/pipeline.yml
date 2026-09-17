@@ -13,9 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  WORKSPACE: /volume2/docker/monitoring_workspace
+  WORKSPACE: /volume2/docker/workspace_monitoring
   RUNNER_DOCKERFILE: ci/Dockerfile.ansible-runner
-  TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/main
+  TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
 
 jobs:
@@ -28,13 +28,28 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     steps:
-      - name: Récupération du code
+      # Nettoyage systématique avant checkout : $WORKSPACE est un chemin fixe
+      # et persistant sur le runner self-hosted. Sans ce nettoyage, un fichier
+      # supprimé dans le commit courant resterait présent (et scanné) d'après
+      # un run précédent.
+      - name: Nettoyage du répertoire
         run: |
           mkdir -p "$WORKSPACE"
+          rm -rf "$WORKSPACE"/*
+
+      # Le token est passé via un fichier de config curl (jamais en argument
+      # de ligne de commande) : sur un runner self-hosted, l'argv complet
+      # d'un process est visible via `ps aux` par tout autre utilisateur/
+      # process de la machine pendant l'exécution, contrairement au contenu
+      # d'un fichier temporaire restreint à 600.
+      - name: Récupération du code
+        run: |
           cd "$WORKSPACE"
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            "$TARBALL_URL" -o repo.tar.gz
+          CURL_CFG=$(mktemp)
+          chmod 600 "$CURL_CFG"
+          printf 'header = "Authorization: Bearer %s"\n' "${{ secrets.MY_GITHUB_TOKEN }}" > "$CURL_CFG"
+          curl -f -L -K "$CURL_CFG" "$TARBALL_URL" -o repo.tar.gz
+          rm -f "$CURL_CFG"
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
@@ -65,13 +80,19 @@ jobs:
     needs: lint
     timeout-minutes: 15
     steps:
-      - name: Récupération du code
+      - name: Nettoyage du répertoire
         run: |
           mkdir -p "$WORKSPACE"
+          rm -rf "$WORKSPACE"/*
+
+      - name: Récupération du code
+        run: |
           cd "$WORKSPACE"
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            "$TARBALL_URL" -o repo.tar.gz
+          CURL_CFG=$(mktemp)
+          chmod 600 "$CURL_CFG"
+          printf 'header = "Authorization: Bearer %s"\n' "${{ secrets.MY_GITHUB_TOKEN }}" > "$CURL_CFG"
+          curl -f -L -K "$CURL_CFG" "$TARBALL_URL" -o repo.tar.gz
+          rm -f "$CURL_CFG"
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
@@ -85,11 +106,14 @@ jobs:
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
 
+      # --redact : évite qu'une valeur de secret détectée soit imprimée en
+      # clair dans le log du job (persistant sur GitHub Actions) — sinon
+      # la fuite dans les logs serait pire que la fuite initiale dans le repo.
       - name: Gitleaks — détection de secrets
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
             zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
-            detect --source /workspace --no-git --exit-code 1
+            detect --source /workspace --no-git --redact --exit-code 1
 
       # Trivy `config` : scanner de mauvaises configurations IaC (Dockerfile,
       # docker-compose, YAML Ansible/Kubernetes, Terraform...). Ne couvre PAS
@@ -198,9 +222,11 @@ jobs:
       - name: Récupération du code
         run: |
           cd "$WORKSPACE"
-          curl -f -L \
-            -H "Authorization: Bearer ${{ secrets.MY_GITHUB_TOKEN }}" \
-            "$TARBALL_URL" -o repo.tar.gz
+          CURL_CFG=$(mktemp)
+          chmod 600 "$CURL_CFG"
+          printf 'header = "Authorization: Bearer %s"\n' "${{ secrets.MY_GITHUB_TOKEN }}" > "$CURL_CFG"
+          curl -f -L -K "$CURL_CFG" "$TARBALL_URL" -o repo.tar.gz
+          rm -f "$CURL_CFG"
           tar -xzf repo.tar.gz --strip-components=1
           rm repo.tar.gz
 
@@ -216,16 +242,67 @@ jobs:
           cd "$WORKSPACE"
           docker build --no-cache -f "$RUNNER_DOCKERFILE" -t ansible-runner:${{ github.sha }} .
 
+      # Même schéma que le scan IaC du job Security : écriture dans le
+      # filesystem interne du conteneur puis extraction via `docker cp`, afin
+      # de produire un SARIF exploitable même quand le step échoue sur des
+      # findings HIGH/CRITICAL (if: always() sur les steps suivants).
       - name: Trivy — scan image construite
         run: |
-          docker run --rm \
+          set +e
+          CID="trivy-image-${{ github.run_id }}-${{ github.run_attempt }}"
+          docker run --name "$CID" \
             -v /var/run/docker.sock:/var/run/docker.sock \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 \
             image \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
             --ignore-unfixed \
+            --format sarif \
+            --output /tmp/trivy-image.sarif \
             ansible-runner:${{ github.sha }}
+          SCAN_EXIT=$?
+          docker cp "$CID":/tmp/trivy-image.sarif "$WORKSPACE/trivy-image.sarif"
+          docker rm "$CID" > /dev/null
+          set -e
+          exit $SCAN_EXIT
+
+      - name: Vérifier que le rapport n'est pas vide
+        if: always()
+        run: |
+          [ -s "$WORKSPACE/trivy-image.sarif" ] || { echo "::error::trivy-image.sarif est vide (0 octet) — l'écriture du rapport a échoué"; exit 1; }
+
+      - name: Résumé des vulnérabilités (image)
+        if: always()
+        run: |
+          echo "## 🔒 Rapport de sécurité — image construite" >> "$GITHUB_STEP_SUMMARY"
+          f="$WORKSPACE/trivy-image.sarif"
+          if [ -f "$f" ]; then
+            total=$(jq '[.runs[].results[]?] | length' "$f" 2>/dev/null)
+            errors=$(jq '[.runs[].results[]? | select(.level=="error")] | length' "$f" 2>/dev/null)
+            total="${total:-0}"
+            errors="${errors:-0}"
+
+            if [ "$errors" -eq 0 ]; then
+              echo "✅ Aucun finding critique/haut ($total au total)" >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "**$errors** critique(s)/haute(s) sur $total findings au total" >> "$GITHUB_STEP_SUMMARY"
+              jq -r '.runs[].results[]? | select(.level=="error") | "- \(.message.text)"' "$f" 2>/dev/null \
+                | head -20 >> "$GITHUB_STEP_SUMMARY"
+              if [ "$errors" -gt 20 ]; then
+                echo "_... et $((errors - 20)) de plus (voir l'artefact SARIF complet)_" >> "$GITHUB_STEP_SUMMARY"
+              fi
+            fi
+          fi
+
+      - name: Upload du rapport SARIF image (artefact)
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: trivy-image-report-sarif
+          path: |
+            ${{ env.WORKSPACE }}/trivy-image.sarif
+          retention-days: 30
+          if-no-files-found: warn
 
       - name: Trivy — génération SBOM (CycloneDX)
         run: |
@@ -280,7 +357,6 @@ jobs:
           set -a; source "$WORKSPACE/.env"; set +a
           docker run --rm \
             -e ANSIBLE_FORCE_COLOR=1 \
-            -e DOCKER_API_VERSION=1.43 \
             -v /var/run/docker.sock:/var/run/docker.sock \
             -v /volume2/docker:/volume2/docker \
             ansible-runner:${{ github.sha }} \
