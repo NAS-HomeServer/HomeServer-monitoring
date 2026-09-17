@@ -1,0 +1,14 @@
+extends: default
+
+rules:
+  # Fichiers YAML à document unique (workflow GitHub Actions, docker-compose,
+  # config Prometheus) : le marqueur "---" n'apporte rien ici.
+  document-start: disable
+  # La config par défaut (80) casse sur les lignes d'images Docker épinglées
+  # par digest sha256 dans pipeline.yml (jusqu'à 149 caractères).
+  line-length:
+    max: 160
+  # Sans ça, la clé "on:" des workflows GitHub Actions (mot-clé booléen en
+  # YAML 1.1) est signalée à tort par la règle truthy.
+  truthy:
+    check-keys: false
