@@ -365,15 +365,28 @@ jobs:
               ansible/playbooks/deploy-monitoring.yml \
               --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}"
 
-      - name: Cleanup image
-        if: always()
-        run: docker rmi ansible-runner:${{ github.sha }} || true
-
       # Supprime tout le répertoire (pas seulement son contenu) en fin de
       # pipeline : le .env créé ci-dessus contient un secret en clair sur le
       # disque persistant du runner self-hosted. Chaque job le recrée déjà
       # automatiquement via `mkdir -p "$WORKSPACE"` en début de run, donc pas
       # besoin de le recréer manuellement avant le prochain déclenchement.
-      - name: Nettoyage final du workspace
+      # IMPORTANT : un `rm -rf "$WORKSPACE"` direct dans le shell du runner
+      # ne suffit pas — le conteneur du runner GitHub n'a pas le même montage
+      # /volume2/docker que le vrai disque du NAS (vérifié sur le repo
+      # HomeServer-multimedia : `ls` en SSH sur le NAS et `ls` dans le runner
+      # ne donnent pas le même résultat, le .env avec le secret en clair
+      # restait donc physiquement sur le disque). En passant par `docker run`
+      # avec le socket Docker de l'hôte, le chemin est résolu par le démon
+      # Docker de l'hôte lui-même, donc sur le vrai /volume2/docker.
+      # Réutilise l'image déjà construite et scannée par "③ Build & Scan",
+      # avant sa suppression juste après.
+      - name: Nettoyage final du workspace (via démon hôte)
         if: always()
-        run: rm -rf "$WORKSPACE"
+        run: |
+          docker run --rm -v /volume2/docker:/volume2/docker \
+            ansible-runner:${{ github.sha }} \
+            rm -rf /volume2/docker/workspace_monitoring
+
+      - name: Cleanup image
+        if: always()
+        run: docker rmi ansible-runner:${{ github.sha }} || true
