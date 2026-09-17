@@ -368,3 +368,12 @@ jobs:
       - name: Cleanup image
         if: always()
         run: docker rmi ansible-runner:${{ github.sha }} || true
+
+      # Supprime tout le répertoire (pas seulement son contenu) en fin de
+      # pipeline : le .env créé ci-dessus contient un secret en clair sur le
+      # disque persistant du runner self-hosted. Chaque job le recrée déjà
+      # automatiquement via `mkdir -p "$WORKSPACE"` en début de run, donc pas
+      # besoin de le recréer manuellement avant le prochain déclenchement.
+      - name: Nettoyage final du workspace
+        if: always()
+        run: rm -rf "$WORKSPACE"
