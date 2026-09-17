@@ -1,0 +1,9 @@
+# DS-0002 (ci/Dockerfile.ansible-runner) — pas d'utilisateur non-root.
+# Risque accepté : ce conteneur doit piloter docker-cli/docker_compose_v2 via
+# le socket Docker de l'hôte (bind mount /var/run/docker.sock) et écrire dans
+# /volume2/docker/{prometheus,grafana} avec des UID hôte précis (root,
+# 1026:100 — cf. docker-compose.yml et ansible/playbooks/deploy-monitoring.yml) ;
+# passer en utilisateur non-root casserait l'accès au socket (permissions liées
+# au GID de l'hôte) et ces écritures. Runner dédié, repo privé, pas de code
+# externe exécuté dans ce conteneur.
+DS-0002
