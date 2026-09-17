@@ -14,9 +14,11 @@ concurrency:
 
 env:
   WORKSPACE: /volume2/docker/workspace_monitoring
+  WORKSPACE_PARENT: /volume2/docker
   RUNNER_DOCKERFILE: ci/Dockerfile.ansible-runner
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
+  ALPINE_IMAGE: alpine:3.22@sha256:14358309a308569c32bdc37e2e0e9694be33a9d99e68afb0f5ff33cc1f695dce
 
 jobs:
 
@@ -32,10 +34,19 @@ jobs:
       # et persistant sur le runner self-hosted. Sans ce nettoyage, un fichier
       # supprimé dans le commit courant resterait présent (et scanné) d'après
       # un run précédent.
-      - name: Nettoyage du répertoire
+      #
+      # Passe par le démon Docker de l'hôte (comme le nettoyage final du job
+      # Deploy) plutôt qu'un `mkdir`/`rm` direct dans le shell du runner : ce
+      # dernier ne partage pas le même montage /volume2/docker que le vrai
+      # disque du NAS (cf. commentaire détaillé dans le job Deploy). Un
+      # `mkdir -p "$WORKSPACE"` local ne crée donc rien côté hôte, et le
+      # `docker run -v "$WORKSPACE":/workspace` qui suit échoue avec
+      # "Bind mount failed: ... does not exist" dès que le répertoire réel
+      # a été supprimé pour de bon (cf. le nettoyage final via démon hôte).
+      - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          mkdir -p "$WORKSPACE"
-          rm -rf "$WORKSPACE"/*
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
+            sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       # Le token est passé via un fichier de config curl (jamais en argument
       # de ligne de commande) : sur un runner self-hosted, l'argv complet
@@ -80,10 +91,12 @@ jobs:
     needs: lint
     timeout-minutes: 15
     steps:
-      - name: Nettoyage du répertoire
+      # Via démon hôte : voir le commentaire détaillé dans le job "① Code
+      # Quality".
+      - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          mkdir -p "$WORKSPACE"
-          rm -rf "$WORKSPACE"/*
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
+            sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       - name: Récupération du code
         run: |
@@ -214,10 +227,12 @@ jobs:
     needs: security
     timeout-minutes: 15
     steps:
-      - name: Nettoyage du répertoire
+      # Via démon hôte : voir le commentaire détaillé dans le job "① Code
+      # Quality".
+      - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          mkdir -p "$WORKSPACE"
-          rm -rf "$WORKSPACE"/*
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
+            sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       - name: Récupération du code
         run: |
