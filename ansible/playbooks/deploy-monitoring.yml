@@ -8,7 +8,7 @@
 
   tasks:
     - name: "Creation des repertoires pour Prometheus"
-      file:
+      ansible.builtin.file:
         path: "/volume2/docker/prometheus/{{ item }}"
         state: directory
         mode: '0755'
@@ -17,13 +17,14 @@
         - 'data'
 
     - name: "Creation du repertoire pour Grafana"
-      file:
+      ansible.builtin.file:
         path: "/volume2/docker/grafana"
         state: directory
         mode: '0755'
 
     - name: "Nettoyage des conteneurs fantomes"
-      command: docker container prune -f
+      ansible.builtin.command: docker container prune -f
+      changed_when: false
 
     - name: "Gestion de la Stack Docker Compose"
       community.docker.docker_compose_v2:
