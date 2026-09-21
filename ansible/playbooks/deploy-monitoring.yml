@@ -11,7 +11,10 @@
       ansible.builtin.file:
         path: "/volume2/docker/prometheus/{{ item }}"
         state: directory
+        owner: "1026"
+        group: "100"
         mode: '0755'
+        recurse: true
       with_items:
         - 'config'
         - 'data'
