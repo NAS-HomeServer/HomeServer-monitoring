@@ -1,9 +1,19 @@
+# Sécurité stricte : pas d'escalade de privilèges ni de capabilities. Convient aux images
+# qui tournent en non-root (nobody, ou user: explicite) et n'ont rien à chown au démarrage.
+x-security-strict: &security-strict
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
     image: prom/prometheus:v3.14.0
     container_name: prometheus
-    user: "root"
+    user: "1026:100"
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -21,29 +31,34 @@ services:
       - '--web.enable-lifecycle'
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 160M
+    mem_limit: 512M
+    memswap_limit: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   node-exporter:
     image: prom/node-exporter:v1.12.1
     container_name: node-exporter
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9100:9100"
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 32M
+    mem_limit: 64M
+    memswap_limit: 64M
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.2
     container_name: cadvisor
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
-    privileged: true
     command:
       - '--housekeeping_interval=30s'
       - '--docker_only=true'
@@ -56,15 +71,15 @@ services:
       - /volume2/@docker:/var/lib/docker:ro
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 200M
+    mem_limit: 200M
+    memswap_limit: 200M
 
   # --- BLOC ALERTING ---
   alertmanager:
     image: prom/alertmanager:v0.34.1
     container_name: alertmanager
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9093:9093"
@@ -76,24 +91,27 @@ services:
       - '--storage.path=/alertmanager'
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 64M
+    mem_limit: 96M
+    memswap_limit: 96M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   alertmanager-discord:
     image: rogerrum/alertmanager-discord:main
     container_name: alertmanager-discord
+    <<: *security-strict
     restart: unless-stopped
     environment:
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
       - DISCORD_USERNAME=Alertmanager
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 32M
+    mem_limit: 32M
+    memswap_limit: 32M
 
   # --- BLOC VISUALISATION ---
   grafana:
@@ -101,6 +119,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
+    <<: *security-strict
     ports:
       - "3001:3000"
     environment:
@@ -117,10 +136,14 @@ services:
       - prometheus
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 300M
+    mem_limit: 512M
+    memswap_limit: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 networks:
   monitoring:
