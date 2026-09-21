@@ -23,7 +23,9 @@
         mode: '0755'
 
     - name: "Nettoyage des conteneurs fantomes"
-      ansible.builtin.command: docker container prune -f
+      # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
+      # (autres stacks comprises : multimedia, cyberlab, hermes-agent, stirling-pdf...).
+      ansible.builtin.command: docker container prune -f --filter label=com.docker.compose.project={{ compose_project_name }}
       changed_when: false
 
     - name: "Gestion de la Stack Docker Compose"
