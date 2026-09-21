@@ -21,10 +21,8 @@ services:
       - '--web.enable-lifecycle'
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 160M
+    mem_limit: 512M
+    memswap_limit: 512M
 
   node-exporter:
     image: prom/node-exporter:v1.12.1
@@ -34,10 +32,8 @@ services:
       - "9100:9100"
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 32M
+    mem_limit: 64M
+    memswap_limit: 64M
 
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.2
@@ -56,10 +52,8 @@ services:
       - /volume2/@docker:/var/lib/docker:ro
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 200M
+    mem_limit: 200M
+    memswap_limit: 200M
 
   # --- BLOC ALERTING ---
   alertmanager:
@@ -76,10 +70,8 @@ services:
       - '--storage.path=/alertmanager'
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 64M
+    mem_limit: 96M
+    memswap_limit: 96M
 
   alertmanager-discord:
     image: rogerrum/alertmanager-discord:main
@@ -90,10 +82,8 @@ services:
       - DISCORD_USERNAME=Alertmanager
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 32M
+    mem_limit: 32M
+    memswap_limit: 32M
 
   # --- BLOC VISUALISATION ---
   grafana:
@@ -117,10 +107,8 @@ services:
       - prometheus
     networks:
       - monitoring
-    deploy:
-      resources:
-        limits:
-          memory: 300M
+    mem_limit: 512M
+    memswap_limit: 512M
 
 networks:
   monitoring:
