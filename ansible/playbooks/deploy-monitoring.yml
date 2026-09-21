@@ -11,7 +11,10 @@
       ansible.builtin.file:
         path: "/volume2/docker/prometheus/{{ item }}"
         state: directory
+        owner: "1026"
+        group: "100"
         mode: '0755'
+        recurse: true
       with_items:
         - 'config'
         - 'data'
@@ -20,10 +23,14 @@
       ansible.builtin.file:
         path: "/volume2/docker/grafana"
         state: directory
+        owner: "1026"
+        group: "100"
         mode: '0755'
 
     - name: "Nettoyage des conteneurs fantomes"
-      ansible.builtin.command: docker container prune -f
+      # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
+      # (autres stacks comprises : multimedia, cyberlab, hermes-agent, stirling-pdf...).
+      ansible.builtin.command: docker container prune -f --filter label=com.docker.compose.project={{ compose_project_name }}
       changed_when: false
 
     - name: "Gestion de la Stack Docker Compose"
