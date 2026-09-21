@@ -1,3 +1,11 @@
+# Sécurité stricte : pas d'escalade de privilèges ni de capabilities. Convient aux images
+# qui tournent en non-root (nobody, ou user: explicite) et n'ont rien à chown au démarrage.
+x-security-strict: &security-strict
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
@@ -23,10 +31,18 @@ services:
       - monitoring
     mem_limit: 512M
     memswap_limit: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
   node-exporter:
     image: prom/node-exporter:v1.12.1
     container_name: node-exporter
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9100:9100"
@@ -59,6 +75,8 @@ services:
   alertmanager:
     image: prom/alertmanager:v0.34.1
     container_name: alertmanager
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9093:9093"
@@ -72,10 +90,17 @@ services:
       - monitoring
     mem_limit: 96M
     memswap_limit: 96M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9093/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
   alertmanager-discord:
     image: rogerrum/alertmanager-discord:main
     container_name: alertmanager-discord
+    <<: *security-strict
     restart: unless-stopped
     environment:
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
@@ -91,6 +116,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
+    <<: *security-strict
     ports:
       - "3001:3000"
     environment:
@@ -109,6 +135,12 @@ services:
       - monitoring
     mem_limit: 512M
     memswap_limit: 512M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
 
 networks:
   monitoring:

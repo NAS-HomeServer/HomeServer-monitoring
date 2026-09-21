@@ -20,6 +20,8 @@
       ansible.builtin.file:
         path: "/volume2/docker/grafana"
         state: directory
+        owner: "1026"
+        group: "100"
         mode: '0755'
 
     - name: "Nettoyage des conteneurs fantomes"
