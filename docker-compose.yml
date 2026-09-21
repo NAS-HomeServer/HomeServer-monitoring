@@ -11,7 +11,9 @@ services:
   prometheus:
     image: prom/prometheus:v3.14.0
     container_name: prometheus
-    user: "root"
+    user: "1026:100"
+    <<: *security-strict
+    read_only: true
     restart: unless-stopped
     ports:
       - "9090:9090"
@@ -54,8 +56,9 @@ services:
   cadvisor:
     image: gcr.io/cadvisor/cadvisor:v0.49.2
     container_name: cadvisor
+    security_opt:
+      - no-new-privileges:true
     restart: unless-stopped
-    privileged: true
     command:
       - '--housekeeping_interval=30s'
       - '--docker_only=true'
