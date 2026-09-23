@@ -148,7 +148,7 @@ services:
 networks:
   monitoring:
     driver: bridge
-    name: monitoring-homeserver
+    name: homeserver-monitoring
 
 # Volumes nommés : driver_opts en bind pointe vers les mêmes chemins hôte
 # gérés par Ansible, aucune donnée déplacée, juste un nom lisible par service
