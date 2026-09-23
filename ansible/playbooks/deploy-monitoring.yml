@@ -4,7 +4,7 @@
   connection: local
   vars:
     compose_project_dir: "/app"          # dossier contenant docker-compose.yml
-    compose_project_name: "monitoring-homeserver"
+    compose_project_name: "homeserver-monitoring"
 
   tasks:
     - name: "Creation des repertoires pour Prometheus"

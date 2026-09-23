@@ -150,42 +150,24 @@ networks:
     driver: bridge
     name: homeserver-monitoring
 
-# Volumes nommés : driver_opts en bind pointe vers les mêmes chemins hôte
-# gérés par Ansible, aucune donnée déplacée, juste un nom lisible par service
-# à la place du hash généré par défaut.
+# Volumes nommés : external true, deja crees hors du cycle de vie Compose
+# (bind vers des chemins geres par Ansible). Docker ne reverifie/reapplique
+# jamais le driver_opts d'un volume existant, external evite juste le
+# warning de mismatch de label de projet.
+# Chemins hote (pour reference, non appliques puisque external) :
+#   prometheus_config    -> /volume2/docker/prometheus/config
+#   prometheus_data      -> /volume2/docker/prometheus/data
+#   alertmanager_config  -> /volume2/docker/alertmanager/config
+#   alertmanager_data    -> /volume2/docker/alertmanager/data
+#   grafana_data         -> /volume2/docker/grafana
 volumes:
   prometheus_config:
-    name: prometheus_config
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume2/docker/prometheus/config
+    external: true
   prometheus_data:
-    name: prometheus_data
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume2/docker/prometheus/data
+    external: true
   alertmanager_config:
-    name: alertmanager_config
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume2/docker/alertmanager/config
+    external: true
   alertmanager_data:
-    name: alertmanager_data
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume2/docker/alertmanager/data
+    external: true
   grafana_data:
-    name: grafana_data
-    driver: local
-    driver_opts:
-      type: none
-      o: bind
-      device: /volume2/docker/grafana
+    external: true
