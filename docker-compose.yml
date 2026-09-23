@@ -18,8 +18,8 @@ services:
     ports:
       - "9090:9090"
     volumes:
-      - /volume2/docker/prometheus/config:/etc/prometheus
-      - /volume2/docker/prometheus/data:/prometheus
+      - prometheus_config:/etc/prometheus
+      - prometheus_data:/prometheus
     command:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
@@ -84,8 +84,8 @@ services:
     ports:
       - "9093:9093"
     volumes:
-      - /volume2/docker/alertmanager/config:/etc/alertmanager
-      - /volume2/docker/alertmanager/data:/alertmanager
+      - alertmanager_config:/etc/alertmanager
+      - alertmanager_data:/alertmanager
     command:
       - '--config.file=/etc/alertmanager/alertmanager.yml'
       - '--storage.path=/alertmanager'
@@ -131,7 +131,7 @@ services:
       - GF_UNIFIED_ALERTING_ENABLED=false
       - GOMAXPROCS=1
     volumes:
-      - /volume2/docker/grafana:/var/lib/grafana
+      - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
     networks:
@@ -149,3 +149,43 @@ networks:
   monitoring:
     driver: bridge
     name: monitoring-homeserver
+
+# Volumes nommés : driver_opts en bind pointe vers les mêmes chemins hôte
+# gérés par Ansible, aucune donnée déplacée, juste un nom lisible par service
+# à la place du hash généré par défaut.
+volumes:
+  prometheus_config:
+    name: prometheus_config
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume2/docker/prometheus/config
+  prometheus_data:
+    name: prometheus_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume2/docker/prometheus/data
+  alertmanager_config:
+    name: alertmanager_config
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume2/docker/alertmanager/config
+  alertmanager_data:
+    name: alertmanager_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume2/docker/alertmanager/data
+  grafana_data:
+    name: grafana_data
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /volume2/docker/grafana
