@@ -129,15 +129,19 @@ services:
       - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
       - GF_ALERTING_ENABLED=false
       - GF_UNIFIED_ALERTING_ENABLED=false
-      - GOMAXPROCS=1
+      - GOMAXPROCS=2
+      - GOMEMLIMIT=800MiB
+      - GF_SNAPSHOTS_ENABLED=false
+      - GF_NEWS_NEWS_FEED_ENABLED=false
+      - GF_PLUGINS_PLUGIN_ADMIN_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
     depends_on:
       - prometheus
     networks:
       - monitoring
-    mem_limit: 512M
-    memswap_limit: 512M
+    mem_limit: 1G
+    memswap_limit: 1G
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 30s
