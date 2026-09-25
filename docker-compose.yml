@@ -9,7 +9,7 @@ x-security-strict: &security-strict
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
-    image: prom/prometheus:v3.14.0
+    image: prom/prometheus:v3.15.0
     container_name: prometheus
     user: "1026:100"
     <<: *security-strict
