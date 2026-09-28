@@ -137,6 +137,8 @@ services:
       - GF_PLUGINS_PLUGIN_ADMIN_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
+      - /volume2/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /volume2/docker/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks:
