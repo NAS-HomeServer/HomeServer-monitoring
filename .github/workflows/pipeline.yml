@@ -389,21 +389,18 @@ jobs:
     environment: production
     timeout-minutes: 10
     steps:
-      # Secret de déploiement (pas de build) : créé ici, dans le seul job
-      # sous le gate environment: production.
-      - name: Créer le fichier .env avec les secrets
-        run: |
-          mkdir -p "$WORKSPACE"
-          {
-            echo "DISCORD_WEBHOOK_URL=${{ secrets.DISCORD_WEBHOOK_URL }}"
-          } > "$WORKSPACE/.env"
-          chmod 600 "$WORKSPACE/.env"
-
+      # Le secret DISCORD_WEBHOOK_URL (environnement production) est passe
+      # directement au playbook via --extra-vars, sans fichier .env
+      # intermediaire sur le disque du runner : seul le receiver Discord
+      # natif d'Alertmanager (config/alertmanager/alertmanager.yml) en a
+      # besoin, plus de relais a configurer via .env.
+      #
       # Image ansible-runner:${{ github.sha }} déjà construite et scannée
       # par le job build-scan (même runner self-hosted, pas de re-build).
       - name: Exécution du playbook
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          set -a; source "$WORKSPACE/.env"; set +a
           docker run --rm \
             -e ANSIBLE_FORCE_COLOR=1 \
             -v /var/run/docker.sock:/var/run/docker.sock \
@@ -415,18 +412,19 @@ jobs:
               --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}"
 
       # Supprime tout le répertoire (pas seulement son contenu) en fin de
-      # pipeline : le .env créé ci-dessus contient un secret en clair sur le
-      # disque persistant du runner self-hosted. Chaque job le recrée déjà
-      # automatiquement via `mkdir -p "$WORKSPACE"` en début de run, donc pas
-      # besoin de le recréer manuellement avant le prochain déclenchement.
+      # pipeline : $WORKSPACE est un chemin fixe et persistant sur le runner
+      # self-hosted, sur lequel le code source complet du repo reste sinon
+      # présent entre deux runs. Chaque job le recrée déjà automatiquement
+      # via `mkdir -p "$WORKSPACE"` en début de run, donc pas besoin de le
+      # recréer manuellement avant le prochain déclenchement.
       # IMPORTANT : un `rm -rf "$WORKSPACE"` direct dans le shell du runner
       # ne suffit pas — le conteneur du runner GitHub n'a pas le même montage
       # /volume2/docker que le vrai disque du NAS (vérifié sur le repo
       # HomeServer-multimedia : `ls` en SSH sur le NAS et `ls` dans le runner
-      # ne donnent pas le même résultat, le .env avec le secret en clair
-      # restait donc physiquement sur le disque). En passant par `docker run`
-      # avec le socket Docker de l'hôte, le chemin est résolu par le démon
-      # Docker de l'hôte lui-même, donc sur le vrai /volume2/docker.
+      # ne donnent pas le même résultat, le contenu du workspace restait donc
+      # physiquement sur le disque). En passant par `docker run` avec le
+      # socket Docker de l'hôte, le chemin est résolu par le démon Docker de
+      # l'hôte lui-même, donc sur le vrai /volume2/docker.
       # Réutilise l'image déjà construite et scannée par "③ Build & Scan",
       # avant sa suppression juste après.
       - name: Nettoyage final du workspace (via démon hôte)

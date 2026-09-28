@@ -7,9 +7,8 @@ route:
 
 receivers:
   - name: discord
-    webhook_configs:
-      # alertmanager-discord ecoute par defaut sur 127.0.0.1:9094 (LISTEN_ADDRESS) ;
-      # override en 0.0.0.0:9094 dans docker-compose.yml pour etre joignable par
-      # Alertmanager depuis un autre conteneur du reseau.
-      - url: 'http://alertmanager-discord:9094'
+    discord_configs:
+      # webhook_url_file (pas webhook_url) : le secret est deploye a part par
+      # Ansible sur le volume alertmanager_config, jamais commite ici.
+      - webhook_url_file: /etc/alertmanager/secrets/discord_webhook
         send_resolved: true
