@@ -98,22 +98,6 @@ services:
       retries: 3
       start_period: 30s
 
-  alertmanager-discord:
-    image: rogerrum/alertmanager-discord:1.0.7
-    container_name: alertmanager-discord
-    <<: *security-strict
-    restart: unless-stopped
-    environment:
-      - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
-      - DISCORD_USERNAME=AlertManager_HomeServer
-      # Par defaut le relais n'ecoute que sur 127.0.0.1:9094, injoignable
-      # depuis le conteneur alertmanager sur le meme reseau bridge.
-      - LISTEN_ADDRESS=0.0.0.0:9094
-    networks:
-      - monitoring
-    mem_limit: 32M
-    memswap_limit: 32M
-
   # --- BLOC VISUALISATION ---
   grafana:
     image: grafana/grafana:13.2.2
