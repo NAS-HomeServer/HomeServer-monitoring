@@ -120,25 +120,27 @@
         DISCORD_USERNAME: "Alertmanager"
 
   handlers:
+    # ansible.builtin.command plutot que community.docker.docker_container_exec/
+    # docker_container : ces deux modules Python ont besoin du SDK "docker"
+    # (et donc "requests"), absent de l'image ansible-runner (qui n'a que le
+    # binaire docker-cli, cf. ci/Dockerfile.ansible-runner). Le CLI est deja
+    # utilise ainsi par la tache "Nettoyage des conteneurs fantomes" ci-dessus.
+    #
     # --web.enable-lifecycle est actif sur Prometheus (docker-compose.yml) :
     # exec dans le conteneur pour rester dans son propre netns (le conteneur
     # ansible-runner n'a pas acces au reseau "monitoring").
     - name: Recharger Prometheus
-      community.docker.docker_container_exec:
-        container: prometheus
-        command: wget -q -O- --post-data='' http://localhost:9090/-/reload
+      ansible.builtin.command: docker exec prometheus wget -q -O- --post-data='' http://localhost:9090/-/reload
+      changed_when: true
 
     # Le rechargement a chaud d'Alertmanager (POST /-/reload) est disponible
     # sans flag supplementaire, a la difference de Prometheus.
     - name: Recharger Alertmanager
-      community.docker.docker_container_exec:
-        container: alertmanager
-        command: wget -q -O- --post-data='' http://localhost:9093/-/reload
+      ansible.builtin.command: docker exec alertmanager wget -q -O- --post-data='' http://localhost:9093/-/reload
+      changed_when: true
 
     # Grafana ne relit son provisioning qu'au demarrage : un redemarrage est
     # necessaire pour appliquer un changement de datasource/dashboard.
     - name: Redemarrer Grafana
-      community.docker.docker_container:
-        name: grafana
-        state: started
-        restart: true
+      ansible.builtin.command: docker restart grafana
+      changed_when: true
