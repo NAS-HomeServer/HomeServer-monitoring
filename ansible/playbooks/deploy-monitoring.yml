@@ -75,6 +75,18 @@
         mode: '0644'
       notify: Recharger Prometheus
 
+    # rule_files: rules/*.yml dans prometheus.yml ne lit que ce repertoire
+    # cote NAS : sans cette copie, une regle ajoutee dans le repo ne serait
+    # jamais chargee par Prometheus.
+    - name: "Deploiement des regles d'alerte Prometheus"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/rules/"
+        dest: /volume2/docker/prometheus/config/rules/
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Recharger Prometheus
+
     - name: "Deploiement de la configuration Alertmanager"
       ansible.builtin.copy:
         src: "{{ repo_root }}/config/alertmanager/alertmanager.yml"
