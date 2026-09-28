@@ -53,7 +53,7 @@ Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansib
 
 Le playbook :
 1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data,config/secrets}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
-2. Déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
+2. Déploie `config/prometheus.yml`, `config/rules/`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
 3. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
 4. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
 5. Recharge Prometheus et Alertmanager à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
@@ -89,7 +89,7 @@ Le playbook Ansible déploie `config/prometheus.yml`, `config/alertmanager/alert
 - Intervalles globaux : `15s` de scrape, `15s` d'évaluation
 - Rétention : **30 jours** ou **2 GB** (la première limite atteinte) ; compaction TSDB par défaut (pas de blocs figés)
 - Sans lockfile, API `--web.enable-lifecycle` active (rechargement via `POST /-/reload`)
-- `rule_files: rules/*.yml` et `alerting` (→ `alertmanager:9093`) configurés ; `config/rules/` est vide pour l'instant (pas encore de règle d'alerte définie)
+- `rule_files: rules/*.yml` et `alerting` (→ `alertmanager:9093`) configurés ; règles dans [`config/rules/`](config/rules/), déployées par le playbook Ansible
 
 Jobs configurés :
 
@@ -117,7 +117,7 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 > L'URL du webhook Discord n'est jamais commitée : le receiver la lit via `webhook_url_file: /etc/alertmanager/secrets/discord_webhook`, un fichier déposé par le playbook Ansible (`mode 0400`, owner `65534:65534`, propriétaire du processus Alertmanager) sur le volume `alertmanager_config`, à partir du secret GitHub `DISCORD_WEBHOOK_URL`.
 
-> Aucune règle d'alerte n'est encore définie (`config/rules/` est vide) : Prometheus n'a rien à évaluer pour l'instant, seule la tuyauterie Prometheus → Alertmanager → Discord est en place.
+> [`config/rules/test-alerting-pipeline.yml`](config/rules/test-alerting-pipeline.yml) définit `TestAlertingPipeline`, une règle toujours active (`expr: vector(1)`, `for: 0m`) qui sert uniquement à vérifier en continu que la chaîne Prometheus → Alertmanager → Discord fonctionne de bout en bout. Ce n'est pas une vraie règle métier.
 
 ### Grafana
 
@@ -153,7 +153,7 @@ HomeServer-monitoring/
 ├── docker-compose.yml                  # Orchestration des conteneurs
 ├── config/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
-│   ├── rules/                          # Règles d'alerte Prometheus (vide pour l'instant)
+│   ├── rules/                          # Règles d'alerte Prometheus (test-alerting-pipeline.yml)
 │   ├── alertmanager/
 │   │   └── alertmanager.yml            # Routage des alertes vers Discord (receiver natif)
 │   └── grafana/
