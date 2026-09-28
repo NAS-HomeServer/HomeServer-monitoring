@@ -50,6 +50,16 @@
         - 'config'
         - 'data'
 
+    # Mode 0700 (pas 0755 comme les autres repertoires Alertmanager) : ce
+    # dossier ne contient que le secret webhook Discord.
+    - name: "Creation du repertoire des secrets Alertmanager"
+      ansible.builtin.file:
+        path: /volume2/docker/alertmanager/config/secrets
+        state: directory
+        owner: "65534"
+        group: "65534"
+        mode: '0700'
+
     # Deploiement des fichiers de configuration versionnes : doit precéder le
     # "up" Docker Compose ci-dessous, sinon Prometheus/Alertmanager demarrent
     # sans --config.file valide sur un volume tout juste cree (crash-loop).
@@ -72,6 +82,19 @@
         owner: "65534"
         group: "65534"
         mode: '0644'
+      notify: Recharger Alertmanager
+
+    # content (pas src) : la valeur vient de l'extra-var discord_webhook_url,
+    # jamais d'un fichier versionne. no_log evite que le secret apparaisse en
+    # clair dans la sortie du run (Ansible logge par defaut le module_args).
+    - name: "Deploiement du secret webhook Discord"
+      ansible.builtin.copy:
+        content: "{{ discord_webhook_url }}"
+        dest: /volume2/docker/alertmanager/config/secrets/discord_webhook
+        owner: "65534"
+        group: "65534"
+        mode: '0400'
+      no_log: true
       notify: Recharger Alertmanager
 
     - name: "Deploiement du provisioning Grafana (datasources)"
@@ -116,8 +139,6 @@
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
-        DISCORD_WEBHOOK_URL: "{{ discord_webhook_url }}"
-        DISCORD_USERNAME: "Alertmanager"
 
   handlers:
     # ansible.builtin.command plutot que community.docker.docker_container_exec/
