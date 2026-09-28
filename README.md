@@ -11,7 +11,7 @@ Stack de monitoring pour NAS Synology (Prometheus, Grafana, Alertmanager avec no
 | Node Exporter | `prom/node-exporter:v1.12.1` | 9100 | Métriques OS (CPU, RAM, disques, réseau) | 64 MB |
 | cAdvisor | `gcr.io/cadvisor/cadvisor:v0.49.2` | — | Métriques des conteneurs Docker | 200 MB |
 | Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes | 96 MB |
-| alertmanager-discord | `rogerrum/alertmanager-discord:main` | — | Relais des alertes vers un webhook Discord | 32 MB |
+| alertmanager-discord | `rogerrum/alertmanager-discord:1.0.7` | — | Relais des alertes vers un webhook Discord | 32 MB |
 
 Tous les services partagent le réseau bridge `monitoring-homeserver`. Le swap est désactivé (`memswap_limit` = `mem_limit`).
 
@@ -33,7 +33,7 @@ Le workflow [`pipeline.yml`](.github/workflows/pipeline.yml) se déclenche à ch
 
 | Job | Contenu |
 |---|---|
-| ① Code Quality | `ansible-lint --profile=production`, `yamllint --strict`, `hadolint` sur le Dockerfile du runner |
+| ① Code Quality | `ansible-lint --profile=production`, `yamllint --strict`, `hadolint` sur le Dockerfile du runner, `promtool check config/rules` et `amtool check-config` |
 | ② Security | Vérification Cosign de l'image Trivy, Gitleaks (secrets), Trivy `config` (IaC) avec rapport SARIF en artefact |
 | ③ Build & Scan | Build de l'image `ansible-runner`, scan Trivy de l'image, génération d'un SBOM CycloneDX |
 | ④ Deploy | Exécution du playbook Ansible depuis l'image construite (gate `environment: production`), puis nettoyage du workspace et de l'image |
@@ -53,9 +53,13 @@ ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitor
 Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansible-runner`) ; ajuster `compose_project_dir` pour une exécution hors conteneur.
 
 Le playbook :
-1. Crée `/volume2/docker/prometheus/{config,data}` et `/volume2/docker/grafana` (propriétaire `1026:100`)
-2. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
-3. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
+1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
+2. Déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml` et le provisioning/dashboards Grafana dans ces répertoires
+3. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
+4. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
+5. Recharge Prometheus et Alertmanager à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
+
+Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
 
 ### Via Docker Compose
 
@@ -69,48 +73,61 @@ DISCORD_WEBHOOK_URL=<URL_WEBHOOK> docker compose -p monitoring-homeserver up -d
 
 | Chemin hôte | Monté dans |
 |---|---|
-| `/volume2/docker/prometheus/config` | Prometheus — `/etc/prometheus` (doit contenir `prometheus.yml`) |
+| `/volume2/docker/prometheus/config` | Prometheus — `/etc/prometheus` (`prometheus.yml`, sous-dossier `rules/`) |
 | `/volume2/docker/prometheus/data` | Prometheus — `/prometheus` |
-| `/volume2/docker/grafana` | Grafana — `/var/lib/grafana` |
-| `/volume2/docker/alertmanager/config` | Alertmanager — `/etc/alertmanager` (doit contenir `alertmanager.yml`) |
+| `/volume2/docker/grafana` | Grafana — `/var/lib/grafana` (données internes, non versionné) |
+| `/volume2/docker/grafana/provisioning` | Grafana — `/etc/grafana/provisioning` (lecture seule) |
+| `/volume2/docker/grafana/dashboards` | Grafana — `/etc/grafana/dashboards` (lecture seule) |
+| `/volume2/docker/alertmanager/config` | Alertmanager — `/etc/alertmanager` (`alertmanager.yml`) |
 | `/volume2/docker/alertmanager/data` | Alertmanager — `/alertmanager` |
 
-Le playbook ne copie pas les fichiers de configuration : `config/prometheus.yml` et `alertmanager.yml` sont à déposer dans ces répertoires. Les répertoires Alertmanager ne sont pas créés par le playbook.
+Le playbook Ansible déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml` et le provisioning/dashboards Grafana depuis le repo vers ces répertoires à chaque exécution : le contenu versionné est la source de vérité.
 
 ### Prometheus — [`config/prometheus.yml`](config/prometheus.yml)
 
 - Intervalles globaux : `15s` de scrape, `15s` d'évaluation
-- Rétention : **3 jours** ou **256 MB** (la première limite atteinte)
-- Blocs TSDB de 2 h, sans lockfile, API `--web.enable-lifecycle` active (rechargement via `POST /-/reload`)
+- Rétention : **30 jours** ou **2 GB** (la première limite atteinte) ; compaction TSDB par défaut (pas de blocs figés)
+- Sans lockfile, API `--web.enable-lifecycle` active (rechargement via `POST /-/reload`)
+- `rule_files: rules/*.yml` et `alerting` (→ `alertmanager:9093`) configurés ; `config/rules/` est vide pour l'instant (pas encore de règle d'alerte définie)
 
 Jobs configurés :
 
 | Job | Cible | Intervalle |
 |---|---|---|
 | `synology-nas` | `node-exporter:9100` | 15s |
-| `docker-containers` | `cadvisor:8080` | 15s |
-| `synology-snmp` | `<IP_DU_NAS>` via `snmp-exporter:9116` | 60s |
+| `docker-containers` | `cadvisor:8080` | 60s |
 | `prometheus` | `localhost:9090` | 15s |
+
+> **Impact rétention 30j/2GB** : la taille reste bornée par `retention.size=2GB`, donc l'usage disque ne grandit pas avec le temps — mais la compaction manipule temporairement plusieurs blocs à la fois et peut ponctuellement utiliser plus de mémoire/disque (~2× brièvement). `mem_limit: 512M` reste probablement suffisant pour le volume de séries actuel (3 exporters, faible cardinalité), mais c'est à surveiller après la mise en prod ; passer à 768M/1G si des OOM apparaissent.
 
 ### SNMP (matériel Synology)
 
-Le job `synology-snmp` (températures, RAID, ventilateurs, UPS) est présent dans `prometheus.yml`, mais le service `snmp-exporter` n'est pas défini dans `docker-compose.yml`. Pour l'activer :
+Un job `synology-snmp` (températures, RAID, ventilateurs, UPS) a existé dans `prometheus.yml`, mais le service `snmp-exporter` n'a jamais été défini dans `docker-compose.yml` : la cible restait `down` en permanence. Il a été retiré. Pour le réactiver un jour :
 
 1. Ajouter un service `snmp-exporter` (port 9116) sur le réseau `monitoring` dans `docker-compose.yml`
-2. Remplacer `<IP_DU_NAS>` par l'adresse IP réelle du NAS dans `config/prometheus.yml`
+2. Réajouter le job dans `config/prometheus.yml`, avec l'IP réelle du NAS
 3. Redéployer la stack
-
-Tant que ce n'est pas fait, la cible apparaît en `down` dans Prometheus.
 
 ### Alerting
 
-Alertmanager transmet les alertes au conteneur `alertmanager-discord`, qui les poste sur le webhook défini par `DISCORD_WEBHOOK_URL`. L'alerting intégré de Grafana est désactivé (`GF_ALERTING_ENABLED=false`, `GF_UNIFIED_ALERTING_ENABLED=false`).
+Prometheus envoie ses alertes à Alertmanager (`alertmanager:9093`, configuré via `alerting.alertmanagers`), qui les route vers le conteneur `alertmanager-discord` ([`config/alertmanager/alertmanager.yml`](config/alertmanager/alertmanager.yml)), qui les poste sur le webhook défini par `DISCORD_WEBHOOK_URL`. L'alerting intégré de Grafana est désactivé (`GF_ALERTING_ENABLED=false`, `GF_UNIFIED_ALERTING_ENABLED=false`).
 
-> `config/prometheus.yml` ne déclare pour l'instant ni `rule_files` ni section `alerting` : Prometheus n'envoie donc aucune alerte à Alertmanager tant que ces blocs ne sont pas ajoutés.
+Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval: 5m`, `repeat_interval: 4h`, `send_resolved: true`.
+
+> Le relais `alertmanager-discord` n'écoute par défaut que sur `127.0.0.1:9094` (injoignable depuis un autre conteneur) : `LISTEN_ADDRESS=0.0.0.0:9094` est fixé explicitement dans `docker-compose.yml`.
+
+> Aucune règle d'alerte n'est encore définie (`config/rules/` est vide) : Prometheus n'a rien à évaluer pour l'instant, seule la tuyauterie Prometheus → Alertmanager → Discord est en place.
 
 ### Grafana
 
 Fuseau `Europe/Paris`, télémétrie et vérifications de mises à jour désactivées, `GOMAXPROCS=1` pour limiter la consommation CPU sur le NAS.
+
+Datasource et dashboards sont provisionnés depuis git ([`config/grafana/provisioning/`](config/grafana/provisioning/)), en lecture seule dans le conteneur :
+- **Datasource** Prometheus (`prometheus`, uid `cfe5m371sd62of`, `http://prometheus:9090`) — nom et uid identiques à la datasource existante, pour ne pas casser les dashboards déjà en place
+- **Dashboards** ([`config/grafana/dashboards/`](config/grafana/dashboards/)) organisés en dossiers (`foldersFromFilesStructure: true`) : `nas/` et `cyberlab/`, tous deux vides pour l'instant
+- Provisioning non modifiable depuis l'UI (`editable: false`, `allowUiUpdates: false`) : toute évolution passe par git
+
+Un changement de provisioning ou de dashboard entraîne un redémarrage automatique de Grafana (nécessaire pour qu'il relise `/etc/grafana/provisioning` et `/etc/grafana/dashboards`, qu'il ne surveille pas en continu).
 
 ## Sécurité des conteneurs
 
@@ -134,7 +151,15 @@ Fuseau `Europe/Paris`, télémétrie et vérifications de mises à jour désacti
 HomeServer-monitoring/
 ├── docker-compose.yml                  # Orchestration des conteneurs
 ├── config/
-│   └── prometheus.yml                  # Scrape jobs Prometheus
+│   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
+│   ├── rules/                          # Règles d'alerte Prometheus (vide pour l'instant)
+│   ├── alertmanager/
+│   │   └── alertmanager.yml            # Routage des alertes vers Discord
+│   └── grafana/
+│       ├── provisioning/
+│       │   ├── datasources/            # Datasource Prometheus provisionnée
+│       │   └── dashboards/             # Provider de dashboards (foldersFromFilesStructure)
+│       └── dashboards/                 # Dashboards JSON, par dossier (nas/, cyberlab/)
 ├── ansible/
 │   ├── inventory/
 │   │   └── hosts.ini                   # Inventaire (localhost)
