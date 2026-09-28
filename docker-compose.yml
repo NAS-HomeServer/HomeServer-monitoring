@@ -105,7 +105,7 @@ services:
     restart: unless-stopped
     environment:
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
-      - DISCORD_USERNAME=Alertmanager
+      - DISCORD_USERNAME=AlertManager_HomeServer
       # Par defaut le relais n'ecoute que sur 127.0.0.1:9094, injoignable
       # depuis le conteneur alertmanager sur le meme reseau bridge.
       - LISTEN_ADDRESS=0.0.0.0:9094
