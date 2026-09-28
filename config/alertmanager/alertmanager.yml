@@ -1,0 +1,15 @@
+route:
+  receiver: discord
+  group_by: ['alertname']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: discord
+    webhook_configs:
+      # alertmanager-discord ecoute par defaut sur 127.0.0.1:9094 (LISTEN_ADDRESS) ;
+      # override en 0.0.0.0:9094 dans docker-compose.yml pour etre joignable par
+      # Alertmanager depuis un autre conteneur du reseau.
+      - url: 'http://alertmanager-discord:9094'
+        send_resolved: true

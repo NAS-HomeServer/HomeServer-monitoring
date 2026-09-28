@@ -2,6 +2,15 @@ global:
   scrape_interval: 15s
   evaluation_interval: 15s
 
+rule_files:
+  - "rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+            - "alertmanager:9093"
+
 scrape_configs:
   # 1. Surveillance du matériel du NAS (CPU, RAM, disques, réseau via OS)
   - job_name: 'synology-nas'
@@ -10,27 +19,11 @@ scrape_configs:
 
   # 2. Surveillance des conteneurs Docker via cAdvisor
   - job_name: 'docker-containers'
+    scrape_interval: 60s
     static_configs:
       - targets: ['cadvisor:8080']
 
-  # 3. Surveillance hardware Synology via SNMP
-  #    (état disques, RAID, températures, ventilateurs, UPS...)
-  #    ⚠️  Remplacer <IP_DU_NAS> par l'IP locale de ton NAS (ex: 192.168.1.100)
-  - job_name: 'synology-snmp'
-    scrape_interval: 60s       # SNMP génère de la charge, 1 min suffit
-    static_configs:
-      - targets: ['<IP_DU_NAS>']
-    metrics_path: /snmp
-    params:
-      auth: [synology]
-      module: [synology, if_mib]
-    relabel_configs:
-      - source_labels: [__address__]
-        target_label: __param_target
-      - target_label: __address__
-        replacement: snmp-exporter:9116
-
-  # 4. Auto-surveillance de Prometheus lui-même
+  # 3. Auto-surveillance de Prometheus lui-même
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']

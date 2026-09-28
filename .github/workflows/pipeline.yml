@@ -19,6 +19,10 @@ env:
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
   ALPINE_IMAGE: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+  # Memes versions que docker-compose.yml, pour valider la config avec le
+  # meme binaire promtool/amtool que celui qui la chargera en production.
+  PROMETHEUS_IMAGE: prom/prometheus:v3.15.0@sha256:efd719c99d83b060d9daefdcf00360461adf279f45ef5391f8d111892118753e
+  ALERTMANAGER_IMAGE: prom/alertmanager:v0.34.1@sha256:e9733bafb1bdef9b00e25a21f8f99dc26a22224bf16641ad754d1649f4c3357a
 
 jobs:
 
@@ -81,6 +85,35 @@ jobs:
           docker run --rm -i \
             hadolint/hadolint:v2.15.1@sha256:32dac94127fd60b7b7e3fbfc65e1383b9b5e25c9bfd7b8536de7a539fe68a12d \
             hadolint --ignore DL3018 - < "$WORKSPACE/$RUNNER_DOCKERFILE"
+
+      # --entrypoint : l'image prom/prometheus a pour ENTRYPOINT /bin/prometheus,
+      # sans override "promtool ..." est passe comme argument a prometheus lui-meme.
+      - name: promtool — validation config Prometheus
+        run: |
+          docker run --rm --entrypoint promtool -v "$WORKSPACE":/workspace \
+            "$PROMETHEUS_IMAGE" \
+            check config /workspace/config/prometheus.yml
+
+      # config/rules ne contient qu'un .gitkeep pour l'instant (aucune regle
+      # d'alerte definie) : on ne fait rien plutot que de faire echouer
+      # promtool sur un appel sans argument.
+      - name: promtool — validation des règles d'alerte
+        run: |
+          RULE_FILES=$(find "$WORKSPACE/config/rules" -maxdepth 1 -name '*.yml')
+          if [ -z "$RULE_FILES" ]; then
+            echo "Aucune règle d'alerte definie, rien à valider."
+            exit 0
+          fi
+          docker run --rm --entrypoint promtool -v "$WORKSPACE":/workspace \
+            "$PROMETHEUS_IMAGE" \
+            check rules $(echo "$RULE_FILES" | sed "s#$WORKSPACE#/workspace#g")
+
+      # --entrypoint : meme raison que promtool ci-dessus (ENTRYPOINT /bin/alertmanager).
+      - name: amtool — validation config Alertmanager
+        run: |
+          docker run --rm --entrypoint amtool -v "$WORKSPACE":/workspace \
+            "$ALERTMANAGER_IMAGE" \
+            check-config /workspace/config/alertmanager/alertmanager.yml
 
   # ─────────────────────────────────────────
   # JOB 2 — Security

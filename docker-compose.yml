@@ -24,10 +24,8 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.no-lockfile'
-      - '--storage.tsdb.retention.time=3d'
-      - '--storage.tsdb.retention.size=256MB'
-      - '--storage.tsdb.min-block-duration=2h'
-      - '--storage.tsdb.max-block-duration=2h'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
     networks:
       - monitoring
@@ -101,13 +99,16 @@ services:
       start_period: 30s
 
   alertmanager-discord:
-    image: rogerrum/alertmanager-discord:main
+    image: rogerrum/alertmanager-discord:1.0.7
     container_name: alertmanager-discord
     <<: *security-strict
     restart: unless-stopped
     environment:
       - DISCORD_WEBHOOK=${DISCORD_WEBHOOK_URL}
       - DISCORD_USERNAME=Alertmanager
+      # Par defaut le relais n'ecoute que sur 127.0.0.1:9094, injoignable
+      # depuis le conteneur alertmanager sur le meme reseau bridge.
+      - LISTEN_ADDRESS=0.0.0.0:9094
     networks:
       - monitoring
     mem_limit: 32M
@@ -136,6 +137,8 @@ services:
       - GF_PLUGINS_PLUGIN_ADMIN_ENABLED=false
     volumes:
       - grafana_data:/var/lib/grafana
+      - /volume2/docker/grafana/provisioning:/etc/grafana/provisioning:ro
+      - /volume2/docker/grafana/dashboards:/etc/grafana/dashboards:ro
     depends_on:
       - prometheus
     networks:

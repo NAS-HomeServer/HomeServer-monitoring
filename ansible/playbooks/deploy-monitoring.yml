@@ -1,10 +1,11 @@
 ---
-- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / cAdvisor)"
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor)"
   hosts: localhost
   connection: local
   vars:
     compose_project_dir: "/app"          # dossier contenant docker-compose.yml
     compose_project_name: "homeserver-monitoring"
+    repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
     - name: "Creation des repertoires pour Prometheus"
@@ -17,15 +18,88 @@
         recurse: true
       with_items:
         - 'config'
+        - 'config/rules'
         - 'data'
 
     - name: "Creation du repertoire pour Grafana"
       ansible.builtin.file:
-        path: "/volume2/docker/grafana"
+        path: "/volume2/docker/grafana/{{ item }}"
         state: directory
         owner: "1026"
         group: "100"
         mode: '0755'
+        recurse: true
+      with_items:
+        - 'provisioning/datasources'
+        - 'provisioning/dashboards'
+        - 'dashboards/nas'
+        - 'dashboards/cyberlab'
+
+    # Le conteneur alertmanager tourne en "nobody" (65534:65534), image par
+    # defaut sans "user:" explicite dans docker-compose.yml (contrairement a
+    # Prometheus/Grafana qui imposent 1026:100).
+    - name: "Creation des repertoires pour Alertmanager"
+      ansible.builtin.file:
+        path: "/volume2/docker/alertmanager/{{ item }}"
+        state: directory
+        owner: "65534"
+        group: "65534"
+        mode: '0755'
+        recurse: true
+      with_items:
+        - 'config'
+        - 'data'
+
+    # Deploiement des fichiers de configuration versionnes : doit precéder le
+    # "up" Docker Compose ci-dessous, sinon Prometheus/Alertmanager demarrent
+    # sans --config.file valide sur un volume tout juste cree (crash-loop).
+    # Les handlers de rechargement/redemarrage, notifies ici, ne s'executent
+    # qu'a la fin du play (apres le "up"), donc uniquement si le fichier a
+    # reellement change ET que le conteneur cible est deja demarre.
+    - name: "Deploiement de la configuration Prometheus"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/prometheus.yml"
+        dest: /volume2/docker/prometheus/config/prometheus.yml
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Recharger Prometheus
+
+    - name: "Deploiement de la configuration Alertmanager"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/alertmanager/alertmanager.yml"
+        dest: /volume2/docker/alertmanager/config/alertmanager.yml
+        owner: "65534"
+        group: "65534"
+        mode: '0644'
+      notify: Recharger Alertmanager
+
+    - name: "Deploiement du provisioning Grafana (datasources)"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/grafana/provisioning/datasources/"
+        dest: /volume2/docker/grafana/provisioning/datasources/
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Redemarrer Grafana
+
+    - name: "Deploiement du provisioning Grafana (dashboards)"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/grafana/provisioning/dashboards/"
+        dest: /volume2/docker/grafana/provisioning/dashboards/
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Redemarrer Grafana
+
+    - name: "Deploiement des dashboards Grafana"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/grafana/dashboards/"
+        dest: /volume2/docker/grafana/dashboards/
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Redemarrer Grafana
 
     - name: "Nettoyage des conteneurs fantomes"
       # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
@@ -44,3 +118,29 @@
         DOCKER_API_VERSION: "1.43"
         DISCORD_WEBHOOK_URL: "{{ discord_webhook_url }}"
         DISCORD_USERNAME: "Alertmanager"
+
+  handlers:
+    # ansible.builtin.command plutot que community.docker.docker_container_exec/
+    # docker_container : ces deux modules Python ont besoin du SDK "docker"
+    # (et donc "requests"), absent de l'image ansible-runner (qui n'a que le
+    # binaire docker-cli, cf. ci/Dockerfile.ansible-runner). Le CLI est deja
+    # utilise ainsi par la tache "Nettoyage des conteneurs fantomes" ci-dessus.
+    #
+    # --web.enable-lifecycle est actif sur Prometheus (docker-compose.yml) :
+    # exec dans le conteneur pour rester dans son propre netns (le conteneur
+    # ansible-runner n'a pas acces au reseau "monitoring").
+    - name: Recharger Prometheus
+      ansible.builtin.command: docker exec prometheus wget -q -O- --post-data='' http://localhost:9090/-/reload
+      changed_when: true
+
+    # Le rechargement a chaud d'Alertmanager (POST /-/reload) est disponible
+    # sans flag supplementaire, a la difference de Prometheus.
+    - name: Recharger Alertmanager
+      ansible.builtin.command: docker exec alertmanager wget -q -O- --post-data='' http://localhost:9093/-/reload
+      changed_when: true
+
+    # Grafana ne relit son provisioning qu'au demarrage : un redemarrage est
+    # necessaire pour appliquer un changement de datasource/dashboard.
+    - name: Redemarrer Grafana
+      ansible.builtin.command: docker restart grafana
+      changed_when: true
