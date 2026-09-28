@@ -10,8 +10,7 @@ Stack de monitoring pour NAS Synology (Prometheus, Grafana, Alertmanager avec no
 | Grafana | `grafana/grafana:13.2.2` | 3001 | Visualisation et dashboards | 512 MB |
 | Node Exporter | `prom/node-exporter:v1.12.1` | 9100 | Métriques OS (CPU, RAM, disques, réseau) | 64 MB |
 | cAdvisor | `gcr.io/cadvisor/cadvisor:v0.49.2` | — | Métriques des conteneurs Docker | 200 MB |
-| Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes | 96 MB |
-| alertmanager-discord | `rogerrum/alertmanager-discord:1.0.7` | — | Relais des alertes vers un webhook Discord | 32 MB |
+| Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes, notifications Discord natives | 96 MB |
 
 Tous les services partagent le réseau bridge `monitoring-homeserver`. Le swap est désactivé (`memswap_limit` = `mem_limit`).
 
@@ -22,7 +21,7 @@ Tous les services partagent le réseau bridge `monitoring-homeserver`. Le swap e
 - NAS Synology avec Container Manager (Docker + Docker Compose v2)
 - Répertoire `/volume2/docker` existant
 - Runner GitHub Actions auto-hébergé sur le NAS, avec accès au socket Docker de l'hôte
-- Secrets GitHub : `MY_GITHUB_TOKEN` (téléchargement du tarball du repo) et `DISCORD_WEBHOOK_URL` (dans l'environnement `production`)
+- Secrets GitHub : `MY_GITHUB_TOKEN` (téléchargement du tarball du repo) et `DISCORD_WEBHOOK_URL` (dans l'environnement `production`, passé au playbook Ansible qui dépose le webhook sur le NAS)
 - Pour un déploiement manuel : Python 3 + Ansible avec la collection `community.docker`
 
 ## Déploiement
@@ -53,8 +52,8 @@ ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitor
 Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansible-runner`) ; ajuster `compose_project_dir` pour une exécution hors conteneur.
 
 Le playbook :
-1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
-2. Déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml` et le provisioning/dashboards Grafana dans ces répertoires
+1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data,config/secrets}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
+2. Déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
 3. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
 4. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
 5. Recharge Prometheus et Alertmanager à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
@@ -64,8 +63,10 @@ Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le r
 ### Via Docker Compose
 
 ```bash
-DISCORD_WEBHOOK_URL=<URL_WEBHOOK> docker compose -p monitoring-homeserver up -d
+docker compose -p monitoring-homeserver up -d
 ```
+
+> Le webhook Discord n'est pas géré par Docker Compose : déposer manuellement `/volume2/docker/alertmanager/config/secrets/discord_webhook` (contenu = l'URL du webhook, `chmod 400`, owner `65534:65534`) avant de démarrer Alertmanager, ou passer par le playbook Ansible ci-dessus.
 
 ## Configuration
 
@@ -78,7 +79,7 @@ DISCORD_WEBHOOK_URL=<URL_WEBHOOK> docker compose -p monitoring-homeserver up -d
 | `/volume2/docker/grafana` | Grafana — `/var/lib/grafana` (données internes, non versionné) |
 | `/volume2/docker/grafana/provisioning` | Grafana — `/etc/grafana/provisioning` (lecture seule) |
 | `/volume2/docker/grafana/dashboards` | Grafana — `/etc/grafana/dashboards` (lecture seule) |
-| `/volume2/docker/alertmanager/config` | Alertmanager — `/etc/alertmanager` (`alertmanager.yml`) |
+| `/volume2/docker/alertmanager/config` | Alertmanager — `/etc/alertmanager` (`alertmanager.yml`, `secrets/discord_webhook`) |
 | `/volume2/docker/alertmanager/data` | Alertmanager — `/alertmanager` |
 
 Le playbook Ansible déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml` et le provisioning/dashboards Grafana depuis le repo vers ces répertoires à chaque exécution : le contenu versionné est la source de vérité.
@@ -110,11 +111,11 @@ Un job `synology-snmp` (températures, RAID, ventilateurs, UPS) a existé dans `
 
 ### Alerting
 
-Prometheus envoie ses alertes à Alertmanager (`alertmanager:9093`, configuré via `alerting.alertmanagers`), qui les route vers le conteneur `alertmanager-discord` ([`config/alertmanager/alertmanager.yml`](config/alertmanager/alertmanager.yml)), qui les poste sur le webhook défini par `DISCORD_WEBHOOK_URL`. L'alerting intégré de Grafana est désactivé (`GF_ALERTING_ENABLED=false`, `GF_UNIFIED_ALERTING_ENABLED=false`).
+Prometheus envoie ses alertes à Alertmanager (`alertmanager:9093`, configuré via `alerting.alertmanagers`), qui les poste directement sur Discord via le receiver natif `discord_configs` ([`config/alertmanager/alertmanager.yml`](config/alertmanager/alertmanager.yml)). L'alerting intégré de Grafana est désactivé (`GF_ALERTING_ENABLED=false`, `GF_UNIFIED_ALERTING_ENABLED=false`).
 
 Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval: 5m`, `repeat_interval: 4h`, `send_resolved: true`.
 
-> Le relais `alertmanager-discord` n'écoute par défaut que sur `127.0.0.1:9094` (injoignable depuis un autre conteneur) : `LISTEN_ADDRESS=0.0.0.0:9094` est fixé explicitement dans `docker-compose.yml`.
+> L'URL du webhook Discord n'est jamais commitée : le receiver la lit via `webhook_url_file: /etc/alertmanager/secrets/discord_webhook`, un fichier déposé par le playbook Ansible (`mode 0400`, owner `65534:65534`, propriétaire du processus Alertmanager) sur le volume `alertmanager_config`, à partir du secret GitHub `DISCORD_WEBHOOK_URL`.
 
 > Aucune règle d'alerte n'est encore définie (`config/rules/` est vide) : Prometheus n'a rien à évaluer pour l'instant, seule la tuyauterie Prometheus → Alertmanager → Discord est en place.
 
@@ -154,7 +155,7 @@ HomeServer-monitoring/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
 │   ├── rules/                          # Règles d'alerte Prometheus (vide pour l'instant)
 │   ├── alertmanager/
-│   │   └── alertmanager.yml            # Routage des alertes vers Discord
+│   │   └── alertmanager.yml            # Routage des alertes vers Discord (receiver natif)
 │   └── grafana/
 │       ├── provisioning/
 │       │   ├── datasources/            # Datasource Prometheus provisionnée
