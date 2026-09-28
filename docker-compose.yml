@@ -24,10 +24,8 @@ services:
       - '--config.file=/etc/prometheus/prometheus.yml'
       - '--storage.tsdb.path=/prometheus'
       - '--storage.tsdb.no-lockfile'
-      - '--storage.tsdb.retention.time=3d'
-      - '--storage.tsdb.retention.size=256MB'
-      - '--storage.tsdb.min-block-duration=2h'
-      - '--storage.tsdb.max-block-duration=2h'
+      - '--storage.tsdb.retention.time=30d'
+      - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
     networks:
       - monitoring
