@@ -27,3 +27,81 @@ scrape_configs:
   - job_name: 'prometheus'
     static_configs:
       - targets: ['localhost:9090']
+
+  # 4. Sondes blackbox : cibles externes du cyberlab, testees depuis le NAS.
+  # Le site est sonde sur son URL finale (aginepro.work/cyberlab), pas sur le
+  # 301 depuis cyberlab.aginepro.work. Le label "module" choisit le module
+  # blackbox par cible (le site est du HTML, il n'a pas de corps "ok").
+  # Les /health des Workers ne testent pas l'origine : ils prouvent seulement
+  # que le Worker repond.
+  - job_name: 'blackbox-cyberlab-external'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /probe
+    static_configs:
+      - targets:
+          - https://aginepro.work/cyberlab
+        labels:
+          module: http_2xx
+      - targets:
+          - https://aginepro.work/api/health
+          - https://cyberlab-api-probe.axelginepro.workers.dev/health
+          - https://cyberlab-audit-proxy.axelginepro.workers.dev/health
+          - https://cyberlab-headers-proxy.axelginepro.workers.dev/health
+          - https://cyberlab-dns-proxy.axelginepro.workers.dev/health
+        labels:
+          module: http_2xx_json
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [module]
+        target_label: __param_module
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # 5. Sondes blackbox : backends internes, joints par nom de conteneur via
+  # le reseau "cyberlab". sherlock est absent : pas de route /health deployee.
+  - job_name: 'blackbox-cyberlab-internal'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /probe
+    params:
+      module: [http_2xx_json]
+    static_configs:
+      - targets:
+          - http://dns_analyzer:4002/health
+          - http://audit_orchestrator:4003/health
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # 6. Sonde "internet" : distingue une coupure internet domestique d'une
+  # panne de service (base de l'alerte InternetDown et de l'inhibition).
+  - job_name: 'blackbox-internet'
+    scrape_interval: 30s
+    scrape_timeout: 10s
+    metrics_path: /probe
+    params:
+      module: [tcp_connect]
+    static_configs:
+      - targets:
+          - 1.1.1.1:443
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: blackbox-exporter:9115
+
+  # 7. Auto-surveillance de blackbox_exporter (les sondes ci-dessus passent
+  # par lui : s'il tombe, elles disparaissent sans alerte probe_success).
+  - job_name: 'blackbox-exporter'
+    static_configs:
+      - targets: ['blackbox-exporter:9115']

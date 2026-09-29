@@ -1,10 +1,11 @@
 ---
-- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor)"
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor / blackbox) + backends cyberlab"
   hosts: localhost
   connection: local
   vars:
     compose_project_dir: "/app"          # dossier contenant docker-compose.yml
     compose_project_name: "homeserver-monitoring"
+    cyberlab_project_dir: "/volume2/docker/cyberlab"
     repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
@@ -34,6 +35,14 @@
         - 'provisioning/dashboards'
         - 'dashboards/nas'
         - 'dashboards/cyberlab'
+
+    - name: "Creation du repertoire de configuration blackbox_exporter"
+      ansible.builtin.file:
+        path: /volume2/docker/blackbox/config
+        state: directory
+        owner: "65534"
+        group: "65534"
+        mode: '0755'
 
     # Le conteneur alertmanager tourne en "nobody" (65534:65534), image par
     # defaut sans "user:" explicite dans docker-compose.yml (contrairement a
@@ -87,6 +96,15 @@
         mode: '0644'
       notify: Recharger Prometheus
 
+    - name: "Deploiement de la configuration blackbox_exporter"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/blackbox/blackbox.yml"
+        dest: /volume2/docker/blackbox/config/blackbox.yml
+        owner: "65534"
+        group: "65534"
+        mode: '0644'
+      notify: Recharger blackbox_exporter
+
     - name: "Deploiement de la configuration Alertmanager"
       ansible.builtin.copy:
         src: "{{ repo_root }}/config/alertmanager/alertmanager.yml"
@@ -136,6 +154,33 @@
         mode: '0644'
       notify: Redemarrer Grafana
 
+    # Backends cyberlab : etape separee (tag "cyberlab", rejouable seule avec
+    # --tags cyberlab, ou exclue avec --skip-tags cyberlab), sur un projet
+    # Compose distinct ("cyberlab", celui deja en place sur le NAS) pour qu'un
+    # deploiement du monitoring ne touche jamais aux backends. Doit preceder
+    # la stack monitoring : celle-ci declare le reseau "cyberlab" en external
+    # et refuse de demarrer s'il n'existe pas. Les .env (secrets) sont deja
+    # sur le NAS, hors git. pull: missing + tags :latest = aucune image tiree
+    # si elle est deja presente (les scripts deploy-*.sh du NAS gerent les
+    # mises a jour applicatives) ; remove_orphans: false par prudence.
+    - name: "Deploiement du compose cyberlab"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/cyberlab/docker-compose.yml"
+        dest: "{{ cyberlab_project_dir }}/docker-compose.yml"
+        mode: '0644'
+      tags: cyberlab
+
+    - name: "Gestion de la stack Docker Compose cyberlab"
+      community.docker.docker_compose_v2:
+        project_src: "{{ cyberlab_project_dir }}"
+        project_name: "cyberlab"
+        state: present
+        pull: missing
+        remove_orphans: false
+      environment:
+        DOCKER_API_VERSION: "1.43"
+      tags: cyberlab
+
     - name: "Nettoyage des conteneurs fantomes"
       # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
       # (autres stacks comprises : multimedia, cyberlab, hermes-agent, stirling-pdf...).
@@ -170,6 +215,12 @@
     # sans flag supplementaire, a la difference de Prometheus.
     - name: Recharger Alertmanager
       ansible.builtin.command: docker exec alertmanager wget -q -O- --post-data='' http://localhost:9093/-/reload
+      changed_when: true
+
+    # blackbox_exporter recharge sa config sur POST /-/reload (aucun flag
+    # requis) ; wget busybox present dans l'image, comme pour les healthchecks.
+    - name: Recharger blackbox_exporter
+      ansible.builtin.command: docker exec blackbox-exporter wget -q -O- --post-data='' http://localhost:9115/-/reload
       changed_when: true
 
     # Grafana ne relit son provisioning qu'au demarrage : un redemarrage est

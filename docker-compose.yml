@@ -27,8 +27,11 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
+    # cyberlab : reseau des backends (dns_analyzer, audit_orchestrator), pour
+    # les sonder par nom de conteneur. Cree par cyberlab/docker-compose.yml.
     networks:
       - monitoring
+      - cyberlab
     mem_limit: 512M
     memswap_limit: 512M
     healthcheck:
@@ -71,6 +74,30 @@ services:
       - monitoring
     mem_limit: 200M
     memswap_limit: 200M
+
+  # --- BLOC SONDES ---
+  blackbox-exporter:
+    image: prom/blackbox-exporter:v0.28.0
+    container_name: blackbox-exporter
+    <<: *security-strict
+    read_only: true
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:9115:9115"
+    volumes:
+      - /volume2/docker/blackbox/config:/etc/blackbox:ro
+    command:
+      - '--config.file=/etc/blackbox/blackbox.yml'
+    networks:
+      - monitoring
+    mem_limit: 64M
+    memswap_limit: 64M
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:9115/-/healthy"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
 
   # --- BLOC ALERTING ---
   alertmanager:
@@ -140,6 +167,11 @@ networks:
   monitoring:
     driver: bridge
     name: homeserver-monitoring
+  # Cree et possede par cyberlab/docker-compose.yml : external ici pour que
+  # le cycle de vie du monitoring (up/down) ne le cree ni ne le supprime.
+  cyberlab:
+    external: true
+    name: cyberlab
 
 # Volumes nommés : external true, deja crees hors du cycle de vie Compose
 # (bind vers des chemins geres par Ansible). Docker ne reverifie/reapplique

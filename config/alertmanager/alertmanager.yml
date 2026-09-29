@@ -5,6 +5,18 @@ route:
   group_interval: 5m
   repeat_interval: 4h
 
+# Coupure internet domestique : les sondes externes echouent toutes, ce n'est
+# pas une panne de service. Seul le job "external" est cible : les sondes
+# internes (reseau Docker local) et cAdvisor ne dependent pas d'internet, une
+# vraie panne locale doit rester visible pendant la coupure. Pas de "equal" :
+# InternetDown n'a pas de label commun avec les alertes ciblees.
+inhibit_rules:
+  - source_matchers:
+      - alertname = "InternetDown"
+    target_matchers:
+      - alertname = "CyberlabProbeDown"
+      - job = "blackbox-cyberlab-external"
+
 receivers:
   - name: discord
     discord_configs:
