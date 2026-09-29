@@ -13,7 +13,7 @@ Stack de monitoring pour NAS Synology (Prometheus, Grafana, Alertmanager avec no
 | Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes, notifications Discord natives | 96 MB |
 | Blackbox Exporter | `prom/blackbox-exporter:v0.28.0` | 9115 (127.0.0.1) | Sondes HTTP/TCP du cyberlab | 64 MB |
 
-Tous les services partagent le réseau bridge `homeserver-monitoring`. Prometheus rejoint en plus le réseau `cyberlab` (voir [Cyberlab](#cyberlab)). Le swap est désactivé (`memswap_limit` = `mem_limit`).
+Tous les services partagent le réseau bridge `homeserver-monitoring`. Blackbox Exporter rejoint en plus le réseau `cyberlab` (voir [Cyberlab](#cyberlab)). Le swap est désactivé (`memswap_limit` = `mem_limit`).
 
 > cAdvisor est volontairement bloqué en `< 0.50.0` dans Renovate (incompatibilité containerd / DSM Synology, cf. incident d'août 2026).
 
@@ -132,7 +132,7 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
 
-- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache Prometheus, ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : l'étape `cyberlab` doit précéder la stack monitoring (c'est le cas dans le playbook).
+- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : l'étape `cyberlab` doit précéder la stack monitoring (c'est le cas dans le playbook).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
 - **Pourquoi une étape Ansible distincte** : projet Compose séparé (`cyberlab`, celui déjà en place) et tag `cyberlab`, pour qu'un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
 
