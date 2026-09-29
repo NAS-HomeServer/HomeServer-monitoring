@@ -3,10 +3,10 @@
 # sherlock/, dns_analyzer/ et audit_orchestrator/ qui contiennent les .env
 # (secrets, jamais versionnes) referencees par env_file ci-dessous.
 #
-# Dette technique : les images applicatives restent en :latest, car les
-# scripts deploy-*.sh du NAS les rebuild et les poussent sous ce tag
-# (+ un tag date) avant `docker compose up -d <service>`. cloudflared est
-# epingle (Renovate propose les mises a jour).
+# Dette technique : toutes les images restent en :latest. Les images
+# applicatives, car les scripts deploy-*.sh du NAS les rebuild et les poussent
+# sous ce tag (+ un tag date) avant `docker compose up -d <service>` ;
+# cloudflared, pour ne pas changer la version en place au premier deploiement.
 #
 # Le reseau "cyberlab" est cree par ce compose (nom fixe) ; le compose
 # monitoring le rejoint en external: true pour sonder les backends.
@@ -39,7 +39,7 @@ services:
     user: 1000:1000
 
   cloudflared-sherlock:
-    image: cloudflare/cloudflared:2026.9.3
+    image: cloudflare/cloudflared:latest
     container_name: cloudflared_sherlock
     command: tunnel run
     env_file:
@@ -65,7 +65,7 @@ services:
     memswap_limit: 512M
 
   cloudflared-dns:
-    image: cloudflare/cloudflared:2026.9.3
+    image: cloudflare/cloudflared:latest
     container_name: cloudflared_dns_analyzer
     command: tunnel run
     env_file:
@@ -91,7 +91,7 @@ services:
     memswap_limit: 512M
 
   cloudflared-audit:
-    image: cloudflare/cloudflared:2026.9.3
+    image: cloudflare/cloudflared:latest
     container_name: cloudflared_audit_orchestrator
     command: tunnel run
     env_file:

@@ -167,7 +167,7 @@ Inhibition ([`alertmanager.yml`](config/alertmanager/alertmanager.yml)) : `Inter
 - Pas de `/health` sur sherlock (sonde HTTP absente) ni sur les Workers `docker-hub-proxy`, `threat-intelligence`, `content-scanner` : hors périmètre. Sherlock n'est couvert que par `CyberlabContainerDown`/`HighMemory`.
 - Toutes les sondes partent du NAS : elles dépendent de l'internet domestique. Un watchdog externe couvrira ce point séparément (hors de cette PR).
 - `CyberlabContainerHighMemory` ne voit que les conteneurs ayant un `mem_limit` (limite 0 = ignoré).
-- Dette technique : les images applicatives (`sherlock-app`, `dns-analyzer`, `audit-orchestrator`) restent en `:latest`, car les scripts `deploy-*.sh` du NAS les poussent sous ce tag. `cloudflared` est épinglé (`2026.9.3`).
+- Dette technique : toutes les images du compose cyberlab restent en `:latest` (applicatives : les scripts `deploy-*.sh` du NAS les poussent sous ce tag ; `cloudflared` : version en place conservée). À épingler dans une PR dédiée, une fois les versions relevées sur le NAS.
 
 ### Grafana
 
