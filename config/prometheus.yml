@@ -1,6 +1,6 @@
 global:
-  scrape_interval: 15s
-  evaluation_interval: 15s
+  scrape_interval: 30s
+  evaluation_interval: 30s
 
 rule_files:
   - "rules/*.yml"
@@ -16,12 +16,21 @@ scrape_configs:
   - job_name: 'synology-nas'
     static_configs:
       - targets: ['node-exporter:9100']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'node_scrape_collector_.*'
+        action: drop
 
   # 2. Surveillance des conteneurs Docker via cAdvisor
+  # Métriques peu utiles droppées pour réduire la cardinalité (RAM Prometheus).
   - job_name: 'docker-containers'
     scrape_interval: 60s
     static_configs:
       - targets: ['cadvisor:8080']
+    metric_relabel_configs:
+      - source_labels: [__name__]
+        regex: 'container_(tasks_state|memory_failures_total|blkio_.*|network_.*_errors_total|network_.*_dropped_total|fs_(io|reads|writes).*|spec_(cpu_.*|memory_reservation_limit_bytes|memory_swap_limit_bytes))'
+        action: drop
 
   # 3. Auto-surveillance de Prometheus lui-même
   - job_name: 'prometheus'
