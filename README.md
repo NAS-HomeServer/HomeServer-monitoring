@@ -128,8 +128,6 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 > L'URL du webhook Discord n'est jamais commitée : le receiver la lit via `webhook_url_file: /etc/alertmanager/secrets/discord_webhook`, un fichier déposé par le playbook Ansible (`mode 0400`, owner `65534:65534`, propriétaire du processus Alertmanager) sur le volume `alertmanager_config`, à partir du secret GitHub `DISCORD_WEBHOOK_URL`.
 
-> [`config/rules/test-alerting-pipeline.yml`](config/rules/test-alerting-pipeline.yml) définit `TestAlertingPipeline`, une règle toujours active (`expr: vector(1)`, `for: 0m`) qui sert uniquement à vérifier en continu que la chaîne Prometheus → Alertmanager → Discord fonctionne de bout en bout. Ce n'est pas une vraie règle métier.
-
 ### Cyberlab
 
 Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
@@ -229,7 +227,7 @@ HomeServer-monitoring/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
 │   ├── blackbox/
 │   │   └── blackbox.yml                # Modules de sonde blackbox_exporter
-│   ├── rules/                          # Règles d'alerte Prometheus (cyberlab.yml, test-alerting-pipeline.yml)
+│   ├── rules/                          # Règles d'alerte Prometheus (cyberlab.yml)
 │   ├── alertmanager/
 │   │   └── alertmanager.yml            # Routage des alertes vers Discord (receiver natif)
 │   └── grafana/
