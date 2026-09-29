@@ -1,11 +1,10 @@
 ---
-- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor / blackbox) + backends cyberlab"
+- name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor / blackbox)"
   hosts: localhost
   connection: local
   vars:
     compose_project_dir: "/app"          # dossier contenant docker-compose.yml
     compose_project_name: "homeserver-monitoring"
-    cyberlab_project_dir: "/volume2/docker/cyberlab"
     repo_root: "{{ playbook_dir }}/../.."
 
   tasks:
@@ -173,33 +172,6 @@
         group: "100"
         mode: '0644'
       notify: Redemarrer Grafana
-
-    # Backends cyberlab : etape separee (tag "cyberlab", rejouable seule avec
-    # --tags cyberlab, ou exclue avec --skip-tags cyberlab), sur un projet
-    # Compose distinct ("cyberlab", celui deja en place sur le NAS) pour qu'un
-    # deploiement du monitoring ne touche jamais aux backends. Doit preceder
-    # la stack monitoring : celle-ci declare le reseau "cyberlab" en external
-    # et refuse de demarrer s'il n'existe pas. Les .env (secrets) sont deja
-    # sur le NAS, hors git. pull: missing + tags :latest = aucune image tiree
-    # si elle est deja presente (les scripts deploy-*.sh du NAS gerent les
-    # mises a jour applicatives) ; remove_orphans: false par prudence.
-    - name: "Deploiement du compose cyberlab"
-      ansible.builtin.copy:
-        src: "{{ repo_root }}/cyberlab/docker-compose.yml"
-        dest: "{{ cyberlab_project_dir }}/docker-compose.yml"
-        mode: '0644'
-      tags: cyberlab
-
-    - name: "Gestion de la stack Docker Compose cyberlab"
-      community.docker.docker_compose_v2:
-        project_src: "{{ cyberlab_project_dir }}"
-        project_name: "cyberlab"
-        state: present
-        pull: missing
-        remove_orphans: false
-      environment:
-        DOCKER_API_VERSION: "1.43"
-      tags: cyberlab
 
     - name: "Nettoyage des conteneurs fantomes"
       # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS

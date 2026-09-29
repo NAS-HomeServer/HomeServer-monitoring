@@ -1,0 +1,151 @@
+name: Pipeline Cyberlab Backends
+
+# Deploiement des backends cyberlab (cyberlab/docker-compose.yml), separe du
+# pipeline de monitoring (monitoring.yml) : un changement de l'un ne redemarre
+# jamais l'autre. Ne se declenche que si les fichiers du cyberlab changent.
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'cyberlab/**'
+      - 'ansible/playbooks/deploy-cyberlab.yml'
+      - '.github/workflows/cyberlab.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-cyberlab-${{ github.ref }}
+  cancel-in-progress: false
+
+env:
+  # Workspace distinct de celui du pipeline monitoring : les deux workflows
+  # peuvent tourner en meme temps sur le runner sans s'ecraser.
+  WORKSPACE: /volume2/docker/workspace_cyberlab
+  WORKSPACE_PARENT: /volume2/docker
+  TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
+  COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
+  ALPINE_IMAGE: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
+
+jobs:
+
+  # ─────────────────────────────────────────
+  # JOB 1 — Qualité & sécurité du compose cyberlab
+  # ─────────────────────────────────────────
+  check:
+    name: "① Qualité & Sécurité"
+    runs-on: self-hosted
+    timeout-minutes: 10
+    steps:
+      # Via démon hôte : voir le commentaire détaillé dans monitoring.yml
+      # (job "① Code Quality").
+      - name: Nettoyage du répertoire (via démon hôte)
+        run: |
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
+            sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
+
+      - name: Récupération du code
+        run: |
+          cd "$WORKSPACE"
+          CURL_CFG=$(mktemp)
+          chmod 600 "$CURL_CFG"
+          printf 'header = "Authorization: Bearer %s"\n' "${{ secrets.MY_GITHUB_TOKEN }}" > "$CURL_CFG"
+          curl -f -L -K "$CURL_CFG" "$TARBALL_URL" -o repo.tar.gz
+          rm -f "$CURL_CFG"
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
+
+      - name: yamllint
+        run: |
+          docker run --rm -v "$WORKSPACE":/workspace \
+            pipelinecomponents/yamllint:0.35.13@sha256:5ab5eb7da0ed5e606b07c1723fc8b275e925189f70ac259b26b7329cb5f8f44d \
+            yamllint -c /workspace/.yamllint.yml /workspace/cyberlab /workspace/ansible/playbooks/deploy-cyberlab.yml --strict
+
+      - name: ansible-lint
+        run: |
+          docker run --rm -v "$WORKSPACE":/workspace \
+            pipelinecomponents/ansible-lint:0.79.38@sha256:1c4d2abd372a2dce7ea1cb8e27b650db809115d410a87a4aba2438bd028de735 \
+            ansible-lint /workspace/ansible/playbooks/deploy-cyberlab.yml --profile=production
+
+      - name: Cosign — vérification image Trivy
+        run: |
+          docker run --rm "$COSIGN_IMAGE" verify \
+            --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
+            --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+            ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+
+      - name: Gitleaks — détection de secrets
+        run: |
+          docker run --rm -v "$WORKSPACE":/workspace \
+            zricethezav/gitleaks:v8.30.1@sha256:c00b6bd0aeb3071cbcb79009cb16a60dd9e0a7c60e2be9ab65d25e6bc8abbb7f \
+            detect --source /workspace/cyberlab --no-git --redact --exit-code 1
+
+      # Sortie tableau sur stdout (pas de SARIF) : pas de fichier à extraire du
+      # conteneur, le résultat est lisible directement dans le log du job.
+      - name: Trivy — scan IaC du compose cyberlab
+        run: |
+          docker run --rm -v "$WORKSPACE":/workspace \
+            ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969 config \
+            --exit-code 1 \
+            --severity HIGH,CRITICAL \
+            --ignorefile /workspace/.trivyignore \
+            /workspace/cyberlab
+
+  # ─────────────────────────────────────────
+  # JOB 2 — Deploy
+  # ─────────────────────────────────────────
+  deploy:
+    name: "② Deploy Cyberlab"
+    runs-on: self-hosted
+    needs: check
+    environment: production
+    timeout-minutes: 10
+    steps:
+      - name: Nettoyage du répertoire (via démon hôte)
+        run: |
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
+            sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
+
+      - name: Récupération du code
+        run: |
+          cd "$WORKSPACE"
+          CURL_CFG=$(mktemp)
+          chmod 600 "$CURL_CFG"
+          printf 'header = "Authorization: Bearer %s"\n' "${{ secrets.MY_GITHUB_TOKEN }}" > "$CURL_CFG"
+          curl -f -L -K "$CURL_CFG" "$TARBALL_URL" -o repo.tar.gz
+          rm -f "$CURL_CFG"
+          tar -xzf repo.tar.gz --strip-components=1
+          rm repo.tar.gz
+
+      # Même Dockerfile que le pipeline monitoring (déjà scanné par Trivy
+      # dans son job "③ Build & Scan"), tag distinct pour ne pas entrer en
+      # collision avec un run monitoring simultané.
+      - name: Build image Ansible
+        run: |
+          cd "$WORKSPACE"
+          docker build -f ci/Dockerfile.ansible-runner -t ansible-runner-cyberlab:${{ github.sha }} .
+
+      - name: Exécution du playbook cyberlab
+        run: |
+          docker run --rm \
+            -e ANSIBLE_FORCE_COLOR=1 \
+            -v /var/run/docker.sock:/var/run/docker.sock \
+            -v /volume2/docker:/volume2/docker \
+            ansible-runner-cyberlab:${{ github.sha }} \
+            ansible-playbook \
+              -i ansible/inventory/hosts.ini \
+              ansible/playbooks/deploy-cyberlab.yml
+
+      # Nettoyage via démon hôte, comme monitoring.yml (cf. son commentaire du
+      # job Deploy sur le montage /volume2/docker du runner).
+      - name: Nettoyage final du workspace (via démon hôte)
+        if: always()
+        run: |
+          docker run --rm -v /volume2/docker:/volume2/docker \
+            ansible-runner-cyberlab:${{ github.sha }} \
+            rm -rf /volume2/docker/workspace_cyberlab
+
+      - name: Cleanup image
+        if: always()
+        run: docker rmi ansible-runner-cyberlab:${{ github.sha }} || true

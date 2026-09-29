@@ -3,6 +3,12 @@ name: Pipeline HomeServer Monitoring
 on:
   push:
     branches: [main]
+    # Les backends cyberlab ont leur propre workflow (cyberlab.yml) : un push
+    # qui ne touche qu'eux ne relance pas le monitoring.
+    paths-ignore:
+      - 'cyberlab/**'
+      - 'ansible/playbooks/deploy-cyberlab.yml'
+      - '.github/workflows/cyberlab.yml'
   workflow_dispatch:
 
 permissions:

@@ -29,7 +29,7 @@ Tous les services partagent le réseau bridge `homeserver-monitoring`. Blackbox 
 
 ### Via GitHub Actions (recommandé)
 
-Le workflow [`pipeline.yml`](.github/workflows/pipeline.yml) se déclenche à chaque push sur `main`, ou manuellement depuis l'onglet **Actions**. Il enchaîne quatre jobs :
+Le workflow [`monitoring.yml`](.github/workflows/monitoring.yml) se déclenche à chaque push sur `main` (sauf s'il ne touche que les fichiers du cyberlab, qui ont leur propre workflow), ou manuellement depuis l'onglet **Actions**. Il enchaîne quatre jobs :
 
 | Job | Contenu |
 |---|---|
@@ -55,14 +55,13 @@ Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansib
 Le playbook :
 1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data,config/secrets}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
 2. Déploie `config/prometheus.yml`, `config/rules/`, `config/blackbox/blackbox.yml`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
-3. **Étape `cyberlab`** (tag Ansible dédié, exécutée avant la stack monitoring) : dépose `cyberlab/docker-compose.yml` dans `/volume2/docker/cyberlab/` et applique le projet Compose `cyberlab` (voir [Cyberlab](#cyberlab))
-4. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
-5. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
-6. Recharge Prometheus, Alertmanager et blackbox_exporter à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
+3. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
+4. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
+5. Recharge Prometheus, Alertmanager et blackbox_exporter à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
 
 Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
 
-Étapes rejouables séparément : `--tags cyberlab` (backends seuls) ou `--skip-tags cyberlab` (monitoring seul).
+Les backends cyberlab ne font pas partie de ce pipeline : voir [`cyberlab.yml`](.github/workflows/cyberlab.yml) dans la section [Cyberlab](#cyberlab).
 
 ### Via Docker Compose
 
@@ -132,9 +131,9 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
 
-- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : l'étape `cyberlab` doit précéder la stack monitoring (c'est le cas dans le playbook).
+- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le workflow cyberlab doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
-- **Pourquoi une étape Ansible distincte** : projet Compose séparé (`cyberlab`, celui déjà en place) et tag `cyberlab`, pour qu'un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
+- **Workflow dédié** : [`cyberlab.yml`](.github/workflows/cyberlab.yml) (yamllint, ansible-lint, gitleaks, Trivy config, puis déploiement via [`deploy-cyberlab.yml`](ansible/playbooks/deploy-cyberlab.yml)) se déclenche sur un push sur `main` qui modifie `cyberlab/**`, ou manuellement. Projet Compose séparé (`cyberlab`), workspace distinct (`workspace_cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
 
 **Cibles blackbox** ([`config/blackbox/blackbox.yml`](config/blackbox/blackbox.yml)) :
 
@@ -239,12 +238,14 @@ HomeServer-monitoring/
 │   ├── inventory/
 │   │   └── hosts.ini                   # Inventaire (localhost)
 │   └── playbooks/
-│       └── deploy-monitoring.yml       # Playbook de déploiement
+│       ├── deploy-monitoring.yml       # Playbook du pipeline monitoring
+│       └── deploy-cyberlab.yml         # Playbook du workflow cyberlab
 ├── ci/
 │   └── Dockerfile.ansible-runner       # Image Ansible utilisée par la CI
 ├── .github/
 │   └── workflows/
-│       └── pipeline.yml                # Pipeline CI/CD (lint, sécurité, build, deploy)
+│       ├── monitoring.yml                # Pipeline CI/CD monitoring (lint, sécurité, build, deploy)
+│       └── cyberlab.yml                # Pipeline CI/CD des backends cyberlab (check, deploy)
 ├── renovate.json                       # Mises à jour automatiques des dépendances
 ├── .trivyignore                        # Risques Trivy acceptés
 └── .yamllint.yml                       # Règles yamllint
