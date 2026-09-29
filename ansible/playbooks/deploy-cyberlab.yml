@@ -1,0 +1,31 @@
+---
+- name: "IaC - Deploiement des backends cyberlab (sherlock / dns_analyzer / audit_orchestrator + cloudflared)"
+  hosts: localhost
+  connection: local
+  vars:
+    cyberlab_project_dir: "/volume2/docker/cyberlab"
+    repo_root: "{{ playbook_dir }}/../.."
+
+  tasks:
+    # Les .env (secrets) sont deja sur le NAS, hors git, dans les sous-dossiers
+    # de ce repertoire. pull: missing + tags :latest = aucune image tiree si
+    # elle est deja presente (les scripts deploy-*.sh du NAS gerent les mises a
+    # jour applicatives) ; remove_orphans: false par prudence.
+    - name: "Deploiement du compose cyberlab"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/cyberlab/docker-compose.yml"
+        dest: "{{ cyberlab_project_dir }}/docker-compose.yml"
+        mode: '0644'
+
+    # Ce compose cree le reseau "cyberlab" (nom fixe) que la stack monitoring
+    # declare en external : le premier deploiement du monitoring exige donc que
+    # ce playbook ait deja tourne une fois.
+    - name: "Gestion de la stack Docker Compose cyberlab"
+      community.docker.docker_compose_v2:
+        project_src: "{{ cyberlab_project_dir }}"
+        project_name: "cyberlab"
+        state: present
+        pull: missing
+        remove_orphans: false
+      environment:
+        DOCKER_API_VERSION: "1.43"
