@@ -1,0 +1,38 @@
+modules:
+  # GET + validation du contenu : un simple code 200 ne suffit pas, le SPA
+  # a un fallback "/* /index.html 200" qui repondrait 200 en HTML si la route
+  # etait mal deployee. Le corps doit contenir un statut ok, insensible a la
+  # casse : {"status":"ok"} (API), {"status":"OK",...} (Worker dns-proxy),
+  # {"ok":true,...} (autres Workers, JSON compact ou indente) ou texte "ok".
+  http_2xx_json:
+    prober: http
+    timeout: 8s
+    http:
+      method: GET
+      valid_status_codes: [200]
+      follow_redirects: true
+      # IPv4 d'abord : le NAS n'a pas forcement de route IPv6 fonctionnelle.
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+      fail_if_body_not_matches_regexp:
+        - '(?i)"status"\s*:\s*"ok"|"ok"\s*:\s*true|^\s*ok\s*$'
+
+  # GET simple, redirections suivies : valide la page finale (site).
+  # Pour les cibles HTTPS, probe_ssl_earliest_cert_expiry est expose par
+  # defaut par le prober http (base de l'alerte CyberlabCertExpiringSoon).
+  http_2xx:
+    prober: http
+    timeout: 8s
+    http:
+      method: GET
+      follow_redirects: true
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
+
+  # Sonde "internet" : connexion TCP sortante, sans dependre d'un service.
+  tcp_connect:
+    prober: tcp
+    timeout: 5s
+    tcp:
+      preferred_ip_protocol: ip4
+      ip_protocol_fallback: false
