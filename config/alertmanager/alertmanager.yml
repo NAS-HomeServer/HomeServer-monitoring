@@ -20,14 +20,16 @@ inhibit_rules:
   # Meme source, cible distincte : CyberlabContainerDown n'a pas de label "job"
   # (il vient d'un vector() + label_replace, pas d'un scrape), donc le matcher
   # job ci-dessus ne peut pas s'y appliquer. On cible par alertname + le label
-  # de regle service="cyberlab". Une seconde regle plutot qu'un alertname=~"A|B"
-  # : les matchers d'une regle sont en ET, et les deux cibles n'ont pas les
-  # memes labels.
+  # "name" du conteneur, et seulement les 3 tunnels cloudflared : les backends
+  # (sherlock, dns_analyzer, audit_orchestrator) ne dependent pas d'internet,
+  # leur crash pendant une coupure est un incident distinct a garder visible.
+  # Les matchers regex sont ancres : la liste explicite reprend celle de la
+  # regle CyberlabContainerDown.
   - source_matchers:
       - alertname = "InternetDown"
     target_matchers:
       - alertname = "CyberlabContainerDown"
-      - service = "cyberlab"
+      - name =~ "cloudflared_(sherlock|dns_analyzer|audit_orchestrator)"
 
 receivers:
   - name: discord

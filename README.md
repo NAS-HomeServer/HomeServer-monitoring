@@ -160,7 +160,7 @@ Cibles : `https://aginepro.work/cyberlab` (`http_2xx`, URL finale), `https://agi
 | `CyberlabContainerHighMemory` | mémoire (working set) > 85 % de `mem_limit` pendant 5m | warning |
 | `BlackboxExporterDown` | blackbox_exporter injoignable pendant 3m (sans lui, `probe_success` disparaît au lieu de passer à 0) | critical |
 
-Inhibition ([`alertmanager.yml`](config/alertmanager/alertmanager.yml)) : `InternetDown` inhibe deux alertes. `CyberlabProbeDown` **du job `blackbox-cyberlab-external` uniquement** (les sondes internes ne dépendent pas d'internet), et `CyberlabContainerDown` (label `service="cyberlab"`), pour éviter une pluie d'alertes simultanées sur un seul incident. Deux règles distinctes car `CyberlabContainerDown` n'a pas de label `job`. Les autres alertes (mémoire, `BlackboxExporterDown`, cAdvisor…) restent visibles pendant une coupure.
+Inhibition ([`alertmanager.yml`](config/alertmanager/alertmanager.yml)) : `InternetDown` inhibe deux alertes. `CyberlabProbeDown` **du job `blackbox-cyberlab-external` uniquement** (les sondes internes ne dépendent pas d'internet), et `CyberlabContainerDown` **des seuls tunnels** `cloudflared_sherlock`, `cloudflared_dns_analyzer` et `cloudflared_audit_orchestrator` (label `name`). Les backends applicatifs (`sherlock`, `dns_analyzer`, `audit_orchestrator`) ne sont **pas** couverts : ils ne dépendent pas d'internet, un crash pendant une coupure reste visible. Deux règles distinctes car `CyberlabContainerDown` n'a pas de label `job`. Les autres alertes (mémoire, `BlackboxExporterDown`, cAdvisor…) restent visibles pendant une coupure.
 
 **Limites connues**
 - Les `/health` des Workers sont codés en dur : ils prouvent que le Worker répond, pas que le backend derrière répond.
