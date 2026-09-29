@@ -158,7 +158,7 @@ Cibles : `https://aginepro.work/cyberlab` (`http_2xx`, URL finale), `https://agi
 | `CyberlabProbeDown` | `probe_success == 0` pendant 3m (jobs external et internal) | critical |
 | `CyberlabProbeSlow` | `probe_duration_seconds > 1` pendant 10m (external) | warning |
 | `CyberlabCertExpiringSoon` | expiration du certificat dans moins de 14 jours | warning |
-| `CyberlabContainerDown` | un des 6 conteneurs n'est plus vu par cAdvisor depuis 3m | critical |
+| `CyberlabContainerDown` | un des 6 conteneurs n'est plus vu par cAdvisor depuis 2 min (critère `container_last_seen`), confirmé pendant 1m | critical |
 | `CyberlabContainerHighMemory` | mémoire (working set) > 85 % de `mem_limit` pendant 5m | warning |
 | `BlackboxExporterDown` | blackbox_exporter injoignable pendant 3m (sans lui, `probe_success` disparaît au lieu de passer à 0) | critical |
 
