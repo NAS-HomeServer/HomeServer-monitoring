@@ -27,11 +27,8 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
-    # cyberlab : reseau des backends (dns_analyzer, audit_orchestrator), pour
-    # les sonder par nom de conteneur. Cree par cyberlab/docker-compose.yml.
     networks:
       - monitoring
-      - cyberlab
     mem_limit: 512M
     memswap_limit: 512M
     healthcheck:
@@ -88,8 +85,12 @@ services:
       - /volume2/docker/blackbox/config:/etc/blackbox:ro
     command:
       - '--config.file=/etc/blackbox/blackbox.yml'
+    # cyberlab : c'est blackbox_exporter (pas Prometheus) qui emet les requetes
+    # de sonde, il doit donc resoudre dns_analyzer / audit_orchestrator par nom
+    # de conteneur. Reseau cree par cyberlab/docker-compose.yml.
     networks:
       - monitoring
+      - cyberlab
     mem_limit: 64M
     memswap_limit: 64M
     healthcheck:
