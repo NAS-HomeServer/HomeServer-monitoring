@@ -6,13 +6,14 @@ Stack de monitoring pour NAS Synology (Prometheus, Grafana, Alertmanager avec no
 
 | Service | Image | Port hôte | Rôle | Mémoire max |
 |---|---|---|---|---|
-| Prometheus | `prom/prometheus:v3.14.0` | 9090 | Base de données de métriques | 512 MB |
+| Prometheus | `prom/prometheus:v3.15.0` | 9090 | Base de données de métriques | 512 MB |
 | Grafana | `grafana/grafana:13.2.2` | 3001 | Visualisation et dashboards | 512 MB |
 | Node Exporter | `prom/node-exporter:v1.12.1` | 9100 | Métriques OS (CPU, RAM, disques, réseau) | 64 MB |
 | cAdvisor | `gcr.io/cadvisor/cadvisor:v0.49.2` | — | Métriques des conteneurs Docker | 200 MB |
 | Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes, notifications Discord natives | 96 MB |
+| Blackbox Exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | Sondes HTTP/TCP du cyberlab | 64 MB |
 
-Tous les services partagent le réseau bridge `monitoring-homeserver`. Le swap est désactivé (`memswap_limit` = `mem_limit`).
+Tous les services partagent le réseau bridge `homeserver-monitoring`. Prometheus rejoint en plus le réseau `cyberlab` (voir [Cyberlab](#cyberlab)). Le swap est désactivé (`memswap_limit` = `mem_limit`).
 
 > cAdvisor est volontairement bloqué en `< 0.50.0` dans Renovate (incompatibilité containerd / DSM Synology, cf. incident d'août 2026).
 
@@ -53,12 +54,15 @@ Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansib
 
 Le playbook :
 1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data,config/secrets}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
-2. Déploie `config/prometheus.yml`, `config/rules/`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
-3. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
-4. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
-5. Recharge Prometheus et Alertmanager à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
+2. Déploie `config/prometheus.yml`, `config/rules/`, `config/blackbox/blackbox.yml`, `config/alertmanager/alertmanager.yml`, le secret webhook Discord (`config/secrets/discord_webhook`, depuis `discord_webhook_url`, jamais versionné) et le provisioning/dashboards Grafana dans ces répertoires
+3. **Étape `cyberlab`** (tag Ansible dédié, exécutée avant la stack monitoring) : dépose `cyberlab/docker-compose.yml` dans `/volume2/docker/cyberlab/` et applique le projet Compose `cyberlab` (voir [Cyberlab](#cyberlab))
+4. Supprime les conteneurs arrêtés **du projet uniquement** (filtre sur le label `com.docker.compose.project`)
+5. Déploie la stack via `community.docker.docker_compose_v2` (`pull: missing`, `remove_orphans: true`)
+6. Recharge Prometheus, Alertmanager et blackbox_exporter à chaud (`POST /-/reload`, via `docker exec` dans chaque conteneur) et redémarre Grafana, uniquement si le fichier de configuration correspondant a changé
 
 Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
+
+Étapes rejouables séparément : `--tags cyberlab` (backends seuls) ou `--skip-tags cyberlab` (monitoring seul).
 
 ### Via Docker Compose
 
@@ -81,6 +85,7 @@ docker compose -p monitoring-homeserver up -d
 | `/volume2/docker/grafana/dashboards` | Grafana — `/etc/grafana/dashboards` (lecture seule) |
 | `/volume2/docker/alertmanager/config` | Alertmanager — `/etc/alertmanager` (`alertmanager.yml`, `secrets/discord_webhook`) |
 | `/volume2/docker/alertmanager/data` | Alertmanager — `/alertmanager` |
+| `/volume2/docker/blackbox/config` | Blackbox Exporter — `/etc/blackbox` (lecture seule, `blackbox.yml`) |
 
 Le playbook Ansible déploie `config/prometheus.yml`, `config/alertmanager/alertmanager.yml` et le provisioning/dashboards Grafana depuis le repo vers ces répertoires à chaque exécution : le contenu versionné est la source de vérité.
 
@@ -98,6 +103,10 @@ Jobs configurés :
 | `synology-nas` | `node-exporter:9100` | 15s |
 | `docker-containers` | `cadvisor:8080` | 60s |
 | `prometheus` | `localhost:9090` | 15s |
+| `blackbox-cyberlab-external` | site, API et 4 Workers via blackbox | 30s |
+| `blackbox-cyberlab-internal` | `dns_analyzer:4002`, `audit_orchestrator:4003` via blackbox | 30s |
+| `blackbox-internet` | TCP `1.1.1.1:443` via blackbox | 30s |
+| `blackbox-exporter` | `blackbox-exporter:9115` | 15s |
 
 > **Impact rétention 30j/2GB** : la taille reste bornée par `retention.size=2GB`, donc l'usage disque ne grandit pas avec le temps — mais la compaction manipule temporairement plusieurs blocs à la fois et peut ponctuellement utiliser plus de mémoire/disque (~2× brièvement). `mem_limit: 512M` reste probablement suffisant pour le volume de séries actuel (3 exporters, faible cardinalité), mais c'est à surveiller après la mise en prod ; passer à 768M/1G si des OOM apparaissent.
 
@@ -119,6 +128,47 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 > [`config/rules/test-alerting-pipeline.yml`](config/rules/test-alerting-pipeline.yml) définit `TestAlertingPipeline`, une règle toujours active (`expr: vector(1)`, `for: 0m`) qui sert uniquement à vérifier en continu que la chaîne Prometheus → Alertmanager → Discord fonctionne de bout en bout. Ce n'est pas une vraie règle métier.
 
+### Cyberlab
+
+Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
+
+- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache Prometheus, ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : l'étape `cyberlab` doit précéder la stack monitoring (c'est le cas dans le playbook).
+- **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
+- **Pourquoi une étape Ansible distincte** : projet Compose séparé (`cyberlab`, celui déjà en place) et tag `cyberlab`, pour qu'un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
+
+**Cibles blackbox** ([`config/blackbox/blackbox.yml`](config/blackbox/blackbox.yml)) :
+
+| Module | Usage |
+|---|---|
+| `http_2xx_json` | GET, code 200 exigé, corps contenant un statut ok (insensible à la casse : `{"status":"ok"}`, `{"ok":true}`, `"status":"OK"`…). Évite le faux positif du fallback SPA (`/* /index.html 200`) |
+| `http_2xx` | GET simple, redirections suivies (site) |
+| `tcp_connect` | Connexion TCP (sonde internet) |
+
+`probe_ssl_earliest_cert_expiry` est exposé par défaut par le prober HTTP sur les cibles HTTPS.
+
+Cibles : `https://aginepro.work/cyberlab` (`http_2xx`, URL finale), `https://aginepro.work/api/health` et les `/health` des Workers `cyberlab-{api-probe,audit-proxy,headers-proxy,dns-proxy}` (`http_2xx_json`), `http://dns_analyzer:4002/health` et `http://audit_orchestrator:4003/health` (interne), `1.1.1.1:443` (internet).
+
+**Règles** ([`config/rules/cyberlab.yml`](config/rules/cyberlab.yml)), toutes avec `service="cyberlab"` ; seuils par défaut, à recalibrer après une semaine de données réelles :
+
+| Alerte | Condition | Sévérité |
+|---|---|---|
+| `InternetDown` | `probe_success == 0` sur la sonde 1.1.1.1 pendant 1m | critical |
+| `CyberlabProbeDown` | `probe_success == 0` pendant 3m (jobs external et internal) | critical |
+| `CyberlabProbeSlow` | `probe_duration_seconds > 1` pendant 10m (external) | warning |
+| `CyberlabCertExpiringSoon` | expiration du certificat dans moins de 14 jours | warning |
+| `CyberlabContainerDown` | un des 6 conteneurs n'est plus vu par cAdvisor depuis 3m | critical |
+| `CyberlabContainerHighMemory` | mémoire (working set) > 85 % de `mem_limit` pendant 5m | warning |
+| `BlackboxExporterDown` | blackbox_exporter injoignable pendant 3m (sans lui, `probe_success` disparaît au lieu de passer à 0) | critical |
+
+Inhibition ([`alertmanager.yml`](config/alertmanager/alertmanager.yml)) : `InternetDown` inhibe `CyberlabProbeDown` **du job `blackbox-cyberlab-external` uniquement**. Les sondes internes et cAdvisor ne dépendent pas d'internet : une vraie panne locale doit rester visible pendant une coupure.
+
+**Limites connues**
+- Les `/health` des Workers sont codés en dur : ils prouvent que le Worker répond, pas que le backend derrière répond.
+- Pas de `/health` sur sherlock (sonde HTTP absente) ni sur les Workers `docker-hub-proxy`, `threat-intelligence`, `content-scanner` : hors périmètre. Sherlock n'est couvert que par `CyberlabContainerDown`/`HighMemory`.
+- Toutes les sondes partent du NAS : elles dépendent de l'internet domestique. Un watchdog externe couvrira ce point séparément (hors de cette PR).
+- `CyberlabContainerHighMemory` ne voit que les conteneurs ayant un `mem_limit` (limite 0 = ignoré).
+- Dette technique : les images applicatives (`sherlock-app`, `dns-analyzer`, `audit-orchestrator`) restent en `:latest`, car les scripts `deploy-*.sh` du NAS les poussent sous ce tag. `cloudflared` est épinglé (`2026.9.3`).
+
 ### Grafana
 
 Fuseau `Europe/Paris`, télémétrie et vérifications de mises à jour désactivées, `GOMAXPROCS=1` pour limiter la consommation CPU sur le NAS.
@@ -134,10 +184,10 @@ Un changement de provisioning ou de dashboard entraîne un redémarrage automati
 
 - `no-new-privileges` sur tous les services
 - `cap_drop: ALL` sur tous les services sauf cAdvisor
-- Système de fichiers en lecture seule (`read_only`) pour Prometheus, Node Exporter et Alertmanager
+- Système de fichiers en lecture seule (`read_only`) pour Prometheus, Node Exporter, Alertmanager et Blackbox Exporter
 - Prometheus et Grafana tournent en non-root (`1026:100`)
 - cAdvisor tourne sans `privileged`, avec des montages en lecture seule
-- Healthchecks sur Prometheus, Alertmanager et Grafana
+- Healthchecks sur Prometheus, Alertmanager, Blackbox Exporter et Grafana
 
 ## Mises à jour des dépendances
 
@@ -151,9 +201,13 @@ Un changement de provisioning ou de dashboard entraîne un redémarrage automati
 ```
 HomeServer-monitoring/
 ├── docker-compose.yml                  # Orchestration des conteneurs
+├── cyberlab/
+│   └── docker-compose.yml              # Backends cyberlab (sherlock, dns_analyzer, audit_orchestrator + cloudflared)
 ├── config/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
-│   ├── rules/                          # Règles d'alerte Prometheus (test-alerting-pipeline.yml)
+│   ├── blackbox/
+│   │   └── blackbox.yml                # Modules de sonde blackbox_exporter
+│   ├── rules/                          # Règles d'alerte Prometheus (cyberlab.yml, test-alerting-pipeline.yml)
 │   ├── alertmanager/
 │   │   └── alertmanager.yml            # Routage des alertes vers Discord (receiver natif)
 │   └── grafana/
@@ -184,3 +238,4 @@ HomeServer-monitoring/
 | Prometheus | `http://<IP_NAS>:9090` |
 | Alertmanager | `http://<IP_NAS>:9093` |
 | Node Exporter | `http://<IP_NAS>:9100/metrics` |
+| Blackbox Exporter | `http://<IP_NAS>:9115` |
