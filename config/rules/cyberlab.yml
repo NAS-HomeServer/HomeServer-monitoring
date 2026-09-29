@@ -82,13 +82,13 @@ groups:
             < 120
           )
           and on () (up{job="docker-containers"} == 1)
-        for: 3m
+        for: 1m
         labels:
           severity: critical
           service: cyberlab
         annotations:
           summary: "Conteneur cyberlab arrete : {{ $labels.name }}"
-          description: "cAdvisor ne voit plus le conteneur {{ $labels.name }} depuis plus de 3 minutes."
+          description: "cAdvisor ne voit plus le conteneur {{ $labels.name }} depuis plus de 3 minutes (2 min sans le voir + 1 min de confirmation)."
 
       # Le filtre "> 0" exclut les conteneurs sans mem_limit : leur limite
       # vaut 0 dans cAdvisor, la division donnerait +Inf (fausse alerte).
