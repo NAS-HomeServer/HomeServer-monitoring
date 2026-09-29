@@ -614,7 +614,7 @@
       ],
       "fieldConfig": {
         "defaults": {
-          "unit": "d",
+          "unit": "suffix: j",
           "decimals": 1,
           "thresholds": {
             "mode": "absolute",
