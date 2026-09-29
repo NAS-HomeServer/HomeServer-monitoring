@@ -1,0 +1,108 @@
+# Backends du cyberlab sur le NAS. Deploye par le playbook Ansible (tag
+# "cyberlab") vers /volume2/docker/cyberlab/, aux cotes des dossiers
+# sherlock/, dns_analyzer/ et audit_orchestrator/ qui contiennent les .env
+# (secrets, jamais versionnes) referencees par env_file ci-dessous.
+#
+# Dette technique : les images applicatives restent en :latest, car les
+# scripts deploy-*.sh du NAS les rebuild et les poussent sous ce tag
+# (+ un tag date) avant `docker compose up -d <service>`. cloudflared est
+# epingle (Renovate propose les mises a jour).
+#
+# Le reseau "cyberlab" est cree par ce compose (nom fixe) ; le compose
+# monitoring le rejoint en external: true pour sonder les backends.
+# Durcissement commun : pas d'escalade de privilèges, aucune capability, système de fichiers en lecture seule
+# (seul /tmp est inscriptible, en mémoire, sans exécution). Les tmpfs comptent dans mem_limit.
+x-hardening: &hardening
+  security_opt:
+    - no-new-privileges:true
+  cap_drop:
+    - ALL
+  read_only: true
+  tmpfs:
+    - /tmp:rw,noexec,nosuid,size=64m
+
+services:
+
+  sherlock:
+    image: registry.homeservers.synology.me/sherlock-app:latest
+    container_name: sherlock
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    environment:
+      - ALLOWED_ORIGINS=https://aginepro.work
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 1024M
+    memswap_limit: 1024M
+    pids_limit: 100
+    user: 1000:1000
+
+  cloudflared-sherlock:
+    image: cloudflare/cloudflared:2026.9.3
+    container_name: cloudflared_sherlock
+    command: tunnel run
+    env_file:
+      - ./sherlock/.env
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 128M
+    memswap_limit: 128M
+    depends_on:
+      - sherlock
+
+  dns-analyzer:
+    image: registry.homeservers.synology.me/dns-analyzer:latest
+    container_name: dns_analyzer
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    env_file:
+      - ./dns_analyzer/.env
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 512M
+    memswap_limit: 512M
+
+  cloudflared-dns:
+    image: cloudflare/cloudflared:2026.9.3
+    container_name: cloudflared_dns_analyzer
+    command: tunnel run
+    env_file:
+      - ./dns_analyzer/.env
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 128M
+    memswap_limit: 128M
+    depends_on:
+      - dns-analyzer
+
+  audit-orchestrator:
+    image: registry.homeservers.synology.me/audit-orchestrator:latest
+    container_name: audit_orchestrator
+    dns:
+      - 8.8.8.8
+      - 1.1.1.1
+    env_file:
+      - ./audit_orchestrator/.env
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 512M
+    memswap_limit: 512M
+
+  cloudflared-audit:
+    image: cloudflare/cloudflared:2026.9.3
+    container_name: cloudflared_audit_orchestrator
+    command: tunnel run
+    env_file:
+      - ./audit_orchestrator/.env
+    restart: unless-stopped
+    <<: *hardening
+    mem_limit: 128M
+    memswap_limit: 128M
+    depends_on:
+      - audit-orchestrator
+
+networks:
+  default:
+    name: cyberlab
