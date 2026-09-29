@@ -400,6 +400,7 @@ jobs:
       - name: Exécution du playbook
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+          PROMETHEUS_EXTERNAL_URL: ${{ vars.PROMETHEUS_EXTERNAL_URL }}
         run: |
           docker run --rm \
             -e ANSIBLE_FORCE_COLOR=1 \
@@ -409,7 +410,8 @@ jobs:
             ansible-playbook \
               -i ansible/inventory/hosts.ini \
               ansible/playbooks/deploy-monitoring.yml \
-              --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}"
+              --extra-vars "discord_webhook_url=${DISCORD_WEBHOOK_URL}" \
+              --extra-vars "prometheus_external_url=${PROMETHEUS_EXTERNAL_URL}"
 
       # Supprime tout le répertoire (pas seulement son contenu) en fin de
       # pipeline : $WORKSPACE est un chemin fixe et persistant sur le runner

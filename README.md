@@ -122,6 +122,8 @@ Un job `synology-snmp` (températures, RAID, ventilateurs, UPS) a existé dans `
 
 Prometheus envoie ses alertes à Alertmanager (`alertmanager:9093`, configuré via `alerting.alertmanagers`), qui les poste directement sur Discord via le receiver natif `discord_configs` ([`config/alertmanager/alertmanager.yml`](config/alertmanager/alertmanager.yml)). L'alerting intégré de Grafana est désactivé (`GF_ALERTING_ENABLED=false`, `GF_UNIFIED_ALERTING_ENABLED=false`).
 
+Le lien « Source » des alertes Discord est construit par Prometheus à partir de `--web.external-url`, valorisé par la variable `PROMETHEUS_EXTERNAL_URL` (défaut `http://localhost:9090`). Pour qu'il soit cliquable, définir la variable GitHub Actions `PROMETHEUS_EXTERNAL_URL` (repo ou environnement `production`, ex. `http://<IP_NAS>:9090`, jamais commitée) : le workflow la passe au playbook, qui l'injecte dans Docker Compose. Sans elle, le lien pointe vers `localhost`. Un changement de valeur recrée le conteneur Prometheus.
+
 Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval: 5m`, `repeat_interval: 4h`, `send_resolved: true`.
 
 > L'URL du webhook Discord n'est jamais commitée : le receiver la lit via `webhook_url_file: /etc/alertmanager/secrets/discord_webhook`, un fichier déposé par le playbook Ansible (`mode 0400`, owner `65534:65534`, propriétaire du processus Alertmanager) sur le volume `alertmanager_config`, à partir du secret GitHub `DISCORD_WEBHOOK_URL`.

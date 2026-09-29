@@ -196,6 +196,8 @@
         remove_orphans: true
       environment:
         DOCKER_API_VERSION: "1.43"
+        # Interpole dans docker-compose.yml (--web.external-url de Prometheus).
+        PROMETHEUS_EXTERNAL_URL: "{{ prometheus_external_url | default('http://localhost:9090', true) }}"
 
   handlers:
     # ansible.builtin.command plutot que community.docker.docker_container_exec/
