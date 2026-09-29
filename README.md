@@ -50,7 +50,7 @@ Points notables :
 ansible-playbook -i ansible/inventory/hosts.ini ansible/playbooks/deploy-monitoring.yml --extra-vars "discord_webhook_url=<URL_WEBHOOK>"
 ```
 
-Le playbook attend le `docker-compose.yml` dans `/app` (chemin de l'image `ansible-runner`) ; ajuster `compose_project_dir` pour une exécution hors conteneur.
+Le playbook attend `monitoring/docker-compose.yml` dans `/app/monitoring` (chemin de l'image `ansible-runner`) ; ajuster `compose_project_dir` pour une exécution hors conteneur.
 
 Le playbook :
 1. Crée les répertoires hôte : `/volume2/docker/prometheus/{config,config/rules,data}` et `grafana/{provisioning/{datasources,dashboards},dashboards/{nas,cyberlab}}` (propriétaire `1026:100`), `/volume2/docker/alertmanager/{config,data,config/secrets}` (propriétaire `65534:65534`, le conteneur tournant en `nobody`)
@@ -111,9 +111,9 @@ Jobs configurés :
 
 ### SNMP (matériel Synology)
 
-Un job `synology-snmp` (températures, RAID, ventilateurs, UPS) a existé dans `prometheus.yml`, mais le service `snmp-exporter` n'a jamais été défini dans `docker-compose.yml` : la cible restait `down` en permanence. Il a été retiré. Pour le réactiver un jour :
+Un job `synology-snmp` (températures, RAID, ventilateurs, UPS) a existé dans `prometheus.yml`, mais le service `snmp-exporter` n'a jamais été défini dans `monitoring/docker-compose.yml` : la cible restait `down` en permanence. Il a été retiré. Pour le réactiver un jour :
 
-1. Ajouter un service `snmp-exporter` (port 9116) sur le réseau `monitoring` dans `docker-compose.yml`
+1. Ajouter un service `snmp-exporter` (port 9116) sur le réseau `monitoring` dans `monitoring/docker-compose.yml`
 2. Réajouter le job dans `config/prometheus.yml`, avec l'IP réelle du NAS
 3. Redéployer la stack
 
@@ -131,7 +131,7 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
 
-- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose racine le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le workflow cyberlab doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
+- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le workflow cyberlab doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
 - **Workflow dédié** : [`cyberlab.yml`](.github/workflows/cyberlab.yml) (yamllint, ansible-lint, gitleaks, Trivy config, puis déploiement via [`deploy-cyberlab.yml`](ansible/playbooks/deploy-cyberlab.yml)) se déclenche sur un push sur `main` qui modifie `cyberlab/**`, ou manuellement. Projet Compose séparé (`cyberlab`), workspace distinct (`workspace_cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
 
@@ -219,7 +219,8 @@ Un changement de provisioning ou de dashboard entraîne un redémarrage automati
 
 ```
 HomeServer-monitoring/
-├── docker-compose.yml                  # Orchestration des conteneurs
+├── monitoring/
+│   └── docker-compose.yml              # Stack monitoring (Prometheus, Grafana, Alertmanager, exporters)
 ├── cyberlab/
 │   └── docker-compose.yml              # Backends cyberlab (sherlock, dns_analyzer, audit_orchestrator + cloudflared)
 ├── config/
