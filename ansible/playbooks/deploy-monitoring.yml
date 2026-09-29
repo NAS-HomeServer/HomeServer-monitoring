@@ -96,6 +96,26 @@
         mode: '0644'
       notify: Recharger Prometheus
 
+    # copy n'efface jamais ce qui a disparu du repo : sans ce nettoyage, une
+    # regle supprimee dans config/rules/ resterait chargee par Prometheus.
+    - name: "Recherche des regles d'alerte deployees sur le NAS"
+      ansible.builtin.find:
+        paths: /volume2/docker/prometheus/config/rules
+        patterns: '*.yml,*.yaml'
+      register: deployed_rules
+
+    - name: "Suppression des regles d'alerte retirees du repo"
+      ansible.builtin.file:
+        path: "{{ item.path }}"
+        state: absent
+      loop: "{{ deployed_rules.files }}"
+      loop_control:
+        label: "{{ item.path | basename }}"
+      when: item.path | basename not in repo_rule_names
+      vars:
+        repo_rule_names: "{{ lookup('ansible.builtin.fileglob', repo_root ~ '/config/rules/*', wantlist=True) | map('basename') | list }}"
+      notify: Recharger Prometheus
+
     - name: "Deploiement de la configuration blackbox_exporter"
       ansible.builtin.copy:
         src: "{{ repo_root }}/config/blackbox/blackbox.yml"
