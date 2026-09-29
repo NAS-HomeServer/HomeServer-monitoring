@@ -11,7 +11,7 @@ Stack de monitoring pour NAS Synology (Prometheus, Grafana, Alertmanager avec no
 | Node Exporter | `prom/node-exporter:v1.12.1` | 9100 | Métriques OS (CPU, RAM, disques, réseau) | 64 MB |
 | cAdvisor | `gcr.io/cadvisor/cadvisor:v0.49.2` | — | Métriques des conteneurs Docker | 200 MB |
 | Alertmanager | `prom/alertmanager:v0.34.1` | 9093 | Routage des alertes, notifications Discord natives | 96 MB |
-| Blackbox Exporter | `prom/blackbox-exporter:v0.28.0` | 9115 | Sondes HTTP/TCP du cyberlab | 64 MB |
+| Blackbox Exporter | `prom/blackbox-exporter:v0.28.0` | 9115 (127.0.0.1) | Sondes HTTP/TCP du cyberlab | 64 MB |
 
 Tous les services partagent le réseau bridge `homeserver-monitoring`. Prometheus rejoint en plus le réseau `cyberlab` (voir [Cyberlab](#cyberlab)). Le swap est désactivé (`memswap_limit` = `mem_limit`).
 
@@ -238,4 +238,4 @@ HomeServer-monitoring/
 | Prometheus | `http://<IP_NAS>:9090` |
 | Alertmanager | `http://<IP_NAS>:9093` |
 | Node Exporter | `http://<IP_NAS>:9100/metrics` |
-| Blackbox Exporter | `http://<IP_NAS>:9115` |
+| Blackbox Exporter | `http://127.0.0.1:9115` (local au NAS uniquement) |

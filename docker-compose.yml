@@ -83,7 +83,7 @@ services:
     read_only: true
     restart: unless-stopped
     ports:
-      - "9115:9115"
+      - "127.0.0.1:9115:9115"
     volumes:
       - /volume2/docker/blackbox/config:/etc/blackbox:ro
     command:
