@@ -175,8 +175,28 @@ Fuseau `Europe/Paris`, télémétrie et vérifications de mises à jour désacti
 
 Datasource et dashboards sont provisionnés depuis git ([`config/grafana/provisioning/`](config/grafana/provisioning/)), en lecture seule dans le conteneur :
 - **Datasource** Prometheus (`prometheus`, uid `cfe5m371sd62of`, `http://prometheus:9090`) — nom et uid identiques à la datasource existante, pour ne pas casser les dashboards déjà en place
-- **Dashboards** ([`config/grafana/dashboards/`](config/grafana/dashboards/)) organisés en dossiers (`foldersFromFilesStructure: true`) : `nas/` et `cyberlab/`, tous deux vides pour l'instant
+- **Dashboards** ([`config/grafana/dashboards/`](config/grafana/dashboards/)) organisés en dossiers (`foldersFromFilesStructure: true`) : `nas/` (vide pour l'instant) et `cyberlab/` (dashboard [Cyberlab](#dashboard-cyberlab))
 - Provisioning non modifiable depuis l'UI (`editable: false`, `allowUiUpdates: false`) : toute évolution passe par git
+
+#### Dashboard Cyberlab
+
+[`config/grafana/dashboards/cyberlab/cyberlab.json`](config/grafana/dashboards/cyberlab/cyberlab.json) (dossier Grafana `cyberlab`, uid `cyberlab-overview`, tags `cyberlab` et `bloc3`, refresh 30 s, fenêtre par défaut 6 h). Il n'ajoute aucune instrumentation : il lit les métriques blackbox_exporter et cAdvisor déjà collectées, via la datasource provisionnée (référencée par uid).
+
+| Row | Panels |
+|---|---|
+| Vue d'ensemble | Sondes UP, Sondes DOWN (rouge dès qu'une sonde est à 0), Alertes actives `service="cyberlab"`, état de la sonde internet (1.1.1.1:443) |
+| Disponibilité et latence | `probe_success` et `probe_duration_seconds` par cible (jobs `blackbox-cyberlab-external` et `-internal`), jours restants avant expiration des certificats TLS (warning sous 14 jours, comme `CyberlabCertExpiringSoon`) |
+| Conteneurs | CPU, mémoire utilisée vs `mem_limit`, état UP/DOWN des 6 conteneurs (même critère que `CyberlabContainerDown` : vu par cAdvisor il y a moins de 120 s) |
+| Alertes | Table des alertes actives `service="cyberlab"` : nom, sévérité, instance ou conteneur, début d'activation |
+
+Variables : `Instance` (multi-select, filtre les panels de sondes) et `Conteneur` (multi-select, liste fixe des 6 conteneurs du compose cyberlab, filtre CPU, mémoire et état). Les stats de la vue d'ensemble ne sont jamais filtrées.
+
+Les dashboards provisionnés sont en lecture seule dans l'UI (`editable: false`, `allowUiUpdates: false`, `disableDeletion: true`) : on modifie le fichier JSON, via git, jamais l'interface (cohérent avec l'IaC ; une modification faite dans l'UI ne pourrait de toute façon pas être enregistrée).
+
+**Limites**
+- La table d'alertes lit les séries `ALERTS` et `ALERTS_FOR_STATE` de Prometheus : aucune datasource Alertmanager n'est provisionnée, et aucune n'a été ajoutée. Conséquence : elle affiche aussi les alertes inhibées ou silencées côté Alertmanager (par exemple `CyberlabProbeDown` pendant un `InternetDown`) ; « Depuis » est le début d'activation dans Prometheus, pas l'heure de notification Discord.
+- L'état d'un conteneur repose sur une liste codée en dur (comme `CyberlabContainerDown`) : un septième conteneur ajouté au compose n'y apparaît pas tant que le dashboard n'est pas mis à jour.
+- Sherlock n'a pas de sonde blackbox : il n'apparaît que dans la row Conteneurs.
 
 Un changement de provisioning ou de dashboard entraîne un redémarrage automatique de Grafana (nécessaire pour qu'il relise `/etc/grafana/provisioning` et `/etc/grafana/dashboards`, qu'il ne surveille pas en continu).
 
@@ -214,7 +234,7 @@ HomeServer-monitoring/
 │       ├── provisioning/
 │       │   ├── datasources/            # Datasource Prometheus provisionnée
 │       │   └── dashboards/             # Provider de dashboards (foldersFromFilesStructure)
-│       └── dashboards/                 # Dashboards JSON, par dossier (nas/, cyberlab/)
+│       └── dashboards/                 # Dashboards JSON, par dossier (nas/, cyberlab/cyberlab.json)
 ├── ansible/
 │   ├── inventory/
 │   │   └── hosts.ini                   # Inventaire (localhost)
