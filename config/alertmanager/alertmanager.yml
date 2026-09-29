@@ -17,6 +17,18 @@ inhibit_rules:
       - alertname = "CyberlabProbeDown"
       - job = "blackbox-cyberlab-external"
 
+  # Meme source, cible distincte : CyberlabContainerDown n'a pas de label "job"
+  # (il vient d'un vector() + label_replace, pas d'un scrape), donc le matcher
+  # job ci-dessus ne peut pas s'y appliquer. On cible par alertname + le label
+  # de regle service="cyberlab". Une seconde regle plutot qu'un alertname=~"A|B"
+  # : les matchers d'une regle sont en ET, et les deux cibles n'ont pas les
+  # memes labels.
+  - source_matchers:
+      - alertname = "InternetDown"
+    target_matchers:
+      - alertname = "CyberlabContainerDown"
+      - service = "cyberlab"
+
 receivers:
   - name: discord
     discord_configs:
