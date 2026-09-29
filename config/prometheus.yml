@@ -29,7 +29,16 @@ scrape_configs:
       - targets: ['cadvisor:8080']
     metric_relabel_configs:
       - source_labels: [__name__]
-        regex: 'container_(tasks_state|memory_failures_total|blkio_.*|network_.*_errors_total|network_.*_dropped_total|fs_(io|reads|writes).*|spec_(cpu_.*|memory_reservation_limit_bytes|memory_swap_limit_bytes))'
+        regex: 'container_(tasks_state|memory_failures_total|blkio_.*)'
+        action: drop
+      - source_labels: [__name__]
+        regex: 'container_network_.*_(errors|dropped)_total'
+        action: drop
+      - source_labels: [__name__]
+        regex: 'container_fs_(io|reads|writes).*'
+        action: drop
+      - source_labels: [__name__]
+        regex: 'container_spec_(cpu_.*|memory_reservation_limit_bytes|memory_swap_limit_bytes)'
         action: drop
 
   # 3. Auto-surveillance de Prometheus lui-même
