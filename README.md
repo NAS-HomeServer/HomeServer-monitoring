@@ -61,7 +61,7 @@ Le playbook :
 
 Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
 
-Les backends cyberlab ne font pas partie de ce pipeline : voir [`cyberlab.yml`](.github/workflows/cyberlab.yml) dans la section [Cyberlab](#cyberlab).
+Les backends cyberlab ne font pas partie de ce pipeline : voir [`cyberlab-backends.yml`](.github/workflows/cyberlab-backends.yml) dans la section [Cyberlab](#cyberlab).
 
 ### Via Docker Compose
 
@@ -133,7 +133,7 @@ Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). 
 
 - **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le workflow cyberlab doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
-- **Workflow dédié** : [`cyberlab.yml`](.github/workflows/cyberlab.yml) (yamllint, ansible-lint, gitleaks, Trivy config, puis déploiement via [`deploy-cyberlab.yml`](ansible/playbooks/deploy-cyberlab.yml)) se déclenche sur un push sur `main` qui modifie `cyberlab/**`, ou manuellement. Projet Compose séparé (`cyberlab`), workspace distinct (`workspace_cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
+- **Workflow dédié** : [`cyberlab-backends.yml`](.github/workflows/cyberlab-backends.yml) (4 jobs : lint, sécurité & gitleaks & Trivy config, build de l'image Ansible, puis déploiement via [`deploy-cyberlab.yml`](ansible/playbooks/deploy-cyberlab.yml)) se déclenche sur un push sur `main` qui modifie `cyberlab/**`, ou manuellement. Projet Compose séparé (`cyberlab`), workspace distinct (`workspace_cyberlab`, un sous-dossier par job) : un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
 
 **Cibles blackbox** ([`config/blackbox/blackbox.yml`](config/blackbox/blackbox.yml)) :
 
@@ -227,7 +227,7 @@ HomeServer-monitoring/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
 │   ├── blackbox/
 │   │   └── blackbox.yml                # Modules de sonde blackbox_exporter
-│   ├── rules/                          # Règles d'alerte Prometheus (cyberlab.yml)
+│   ├── rules/                          # Règles d'alerte Prometheus (cyberlab-backends.yml)
 │   ├── alertmanager/
 │   │   └── alertmanager.yml            # Routage des alertes vers Discord (receiver natif)
 │   └── grafana/
