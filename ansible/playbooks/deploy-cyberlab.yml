@@ -57,4 +57,3 @@
         remove_orphans: false
       environment:
         DOCKER_API_VERSION: "1.43"
-        
