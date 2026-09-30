@@ -21,9 +21,8 @@ concurrency:
 
 env:
   # Workspace distinct de celui du pipeline monitoring : les deux workflows
-  # peuvent tourner en meme temps sur le runner sans s'ecraser. Chaque job
-  # travaille dans son propre sous-dossier (defini au niveau du job) : lint et
-  # securite tournent en parallele sans s'ecraser.
+  # peuvent tourner en meme temps sur le runner sans s'ecraser. Les jobs
+  # s'enchainent (lint -> securite -> build -> deploy) et le nettoient a la fin.
   WORKSPACE: /volume2/docker/workspace_cyberlab
   WORKSPACE_PARENT: /volume2/docker
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
@@ -39,8 +38,6 @@ jobs:
     name: "① Lint"
     runs-on: self-hosted
     timeout-minutes: 10
-    env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab/lint
     steps:
       # Via démon hôte : voir le commentaire détaillé dans monitoring.yml
       # (job "① Code Quality").
@@ -84,9 +81,8 @@ jobs:
   security:
     name: "② Sécurité"
     runs-on: self-hosted
+    needs: lint
     timeout-minutes: 10
-    env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab/security
     steps:
       - name: Nettoyage du répertoire (via démon hôte)
         run: |
@@ -143,10 +139,8 @@ jobs:
   build:
     name: "③ Build Image Ansible"
     runs-on: self-hosted
-    needs: [lint, security]
+    needs: security
     timeout-minutes: 10
-    env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab/build
     steps:
       - name: Nettoyage du répertoire (via démon hôte)
         run: |
