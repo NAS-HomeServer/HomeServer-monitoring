@@ -54,7 +54,7 @@ services:
       - sherlock
 
   dns-analyzer:
-    image: ghcr.io/ag69075/cyberlab_dns-analyzer@sha256:de4099797335e18b6d4423cca6143c9e3c0e4cda4841c4c037da876abd64f705
+    image: ghcr.io/ag69075/cyberlab_dns-analyzer@sha256:40f85f354627314bbb7b8d08edeaca844faeaba68d8e78b0a62aa497bdb31653
     container_name: dns_analyzer
     dns:
       - 8.8.8.8
