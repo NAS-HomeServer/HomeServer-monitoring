@@ -20,9 +20,12 @@ concurrency:
   cancel-in-progress: false
 
 env:
-  # Un workspace distinct par job (defini au niveau du job) et distinct de
-  # celui du monitoring : lint et securite tournent en parallele sans s'ecraser.
-  WORKSPACE_ROOT: /volume2/docker
+  # Workspace distinct de celui du pipeline monitoring : les deux workflows
+  # peuvent tourner en meme temps sur le runner sans s'ecraser. Chaque job
+  # travaille dans son propre sous-dossier (defini au niveau du job) : lint et
+  # securite tournent en parallele sans s'ecraser.
+  WORKSPACE: /volume2/docker/workspace_cyberlab
+  WORKSPACE_PARENT: /volume2/docker
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
   ALPINE_IMAGE: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
@@ -37,13 +40,13 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab_lint
+      WORKSPACE: /volume2/docker/workspace_cyberlab/lint
     steps:
       # Via démon hôte : voir le commentaire détaillé dans monitoring.yml
       # (job "① Code Quality").
       - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       - name: Récupération du code
@@ -72,7 +75,7 @@ jobs:
       - name: Nettoyage final du workspace (via démon hôte)
         if: always()
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             rm -rf "$WORKSPACE"
 
   # ─────────────────────────────────────────
@@ -83,11 +86,11 @@ jobs:
     runs-on: self-hosted
     timeout-minutes: 10
     env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab_security
+      WORKSPACE: /volume2/docker/workspace_cyberlab/security
     steps:
       - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       - name: Récupération du code
@@ -127,7 +130,7 @@ jobs:
       - name: Nettoyage final du workspace (via démon hôte)
         if: always()
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             rm -rf "$WORKSPACE"
 
   # ─────────────────────────────────────────
@@ -143,11 +146,11 @@ jobs:
     needs: [lint, security]
     timeout-minutes: 10
     env:
-      WORKSPACE: /volume2/docker/workspace_cyberlab_build
+      WORKSPACE: /volume2/docker/workspace_cyberlab/build
     steps:
       - name: Nettoyage du répertoire (via démon hôte)
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             sh -c "mkdir -p '$WORKSPACE' && rm -rf '$WORKSPACE'/*"
 
       - name: Récupération du code
@@ -169,7 +172,7 @@ jobs:
       - name: Nettoyage final du workspace (via démon hôte)
         if: always()
         run: |
-          docker run --rm -v "$WORKSPACE_ROOT":"$WORKSPACE_ROOT" "$ALPINE_IMAGE" \
+          docker run --rm -v "$WORKSPACE_PARENT":"$WORKSPACE_PARENT" "$ALPINE_IMAGE" \
             rm -rf "$WORKSPACE"
 
   # ─────────────────────────────────────────
