@@ -84,6 +84,7 @@ jobs:
   security:
     name: "② Sécurité"
     runs-on: self-hosted
+    needs: lint
     timeout-minutes: 10
     env:
       WORKSPACE: /volume2/docker/workspace_cyberlab/security
@@ -143,7 +144,7 @@ jobs:
   build:
     name: "③ Build Image Ansible"
     runs-on: self-hosted
-    needs: [lint, security]
+    needs: security
     timeout-minutes: 10
     env:
       WORKSPACE: /volume2/docker/workspace_cyberlab/build
