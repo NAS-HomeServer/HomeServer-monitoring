@@ -5,12 +5,40 @@
   vars:
     cyberlab_project_dir: "/volume2/docker/cyberlab"
     repo_root: "{{ playbook_dir }}/../.."
+    cosign_image: "gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8"
+    # Images des backends signees par la CI de leur depot (GHCR, digest epingle).
+    # Doit rester identique aux digests du docker-compose.yml.
+    signed_images:
+      - image: "ghcr.io/ag69075/cyberlab_sherlock_backend@sha256:3106a9a56b7094855a59adfd1dec44fd5a74b430ef5453fc6b09f6e929b10bcd"
+        repo: "ag69075/cyberlab_sherlock_backend"
+      - image: "ghcr.io/ag69075/cyberlab_dns-analyzer@sha256:de4099797335e18b6d4423cca6143c9e3c0e4cda4841c4c037da876abd64f705"
+        repo: "ag69075/cyberlab_dns-analyzer"
+      - image: "ghcr.io/ag69075/cyberlab_audit_orchestrator@sha256:633c00ecf4eb57241d9bd9ace4f0c5781abc2af54799bc90090bce1db5e77690"
+        repo: "ag69075/cyberlab_audit_orchestrator"
 
   tasks:
+    # Gate : on ne deploie que des images signees par la CI du depot attendu.
+    # Si une verification echoue, rien n'est copie ni deploye.
+    - name: "Verification de la signature Cosign des images backends"
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - "{{ cosign_image }}"
+          - verify
+          - --certificate-identity-regexp
+          - "https://github.com/{{ item.repo }}/"
+          - --certificate-oidc-issuer
+          - "https://token.actions.githubusercontent.com"
+          - "{{ item.image }}"
+      loop: "{{ signed_images }}"
+      changed_when: false
+
     # Les .env (secrets) sont deja sur le NAS, hors git, dans les sous-dossiers
-    # de ce repertoire. pull: missing + tags :latest = aucune image tiree si
-    # elle est deja presente (les scripts deploy-*.sh du NAS gerent les mises a
-    # jour applicatives) ; remove_orphans: false par prudence.
+    # de ce repertoire. Les images backends sont epinglees par digest : un
+    # nouveau digest n'etant pas present, pull: missing le tire.
+    # remove_orphans: false par prudence.
     - name: "Deploiement du compose cyberlab"
       ansible.builtin.copy:
         src: "{{ repo_root }}/cyberlab/docker-compose.yml"
