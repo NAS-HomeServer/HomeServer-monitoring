@@ -10,11 +10,11 @@
     # Doit rester identique aux digests du docker-compose.yml.
     signed_images:
       - image: "ghcr.io/ag69075/cyberlab_sherlock_backend@sha256:3106a9a56b7094855a59adfd1dec44fd5a74b430ef5453fc6b09f6e929b10bcd"
-        repo: "ag69075/cyberlab_sherlock_backend"
+        repo: "AG69075/cyberlab_sherlock_backend"
       - image: "ghcr.io/ag69075/cyberlab_dns-analyzer@sha256:de4099797335e18b6d4423cca6143c9e3c0e4cda4841c4c037da876abd64f705"
-        repo: "ag69075/cyberlab_dns-analyzer"
+        repo: "AG69075/cyberlab_dns-analyzer"
       - image: "ghcr.io/ag69075/cyberlab_audit_orchestrator@sha256:633c00ecf4eb57241d9bd9ace4f0c5781abc2af54799bc90090bce1db5e77690"
-        repo: "ag69075/cyberlab_audit_orchestrator"
+        repo: "AG69075/cyberlab_audit_orchestrator"
 
   tasks:
     # Gate : on ne deploie que des images signees par la CI du depot attendu.
