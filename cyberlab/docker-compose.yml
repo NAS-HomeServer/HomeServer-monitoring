@@ -26,7 +26,7 @@ x-hardening: &hardening
 services:
 
   sherlock:
-    image: ghcr.io/ag69075/cyberlab_sherlock_backend@sha256:3106a9a56b7094855a59adfd1dec44fd5a74b430ef5453fc6b09f6e929b10bcd
+    image: ghcr.io/ag69075/cyberlab_sherlock_backend@sha256:11a667c0ef645761f2a47dabb585907f6d706185239a5e887f20974b2086321c
     container_name: sherlock
     dns:
       - 8.8.8.8
