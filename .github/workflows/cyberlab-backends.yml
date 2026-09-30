@@ -3,6 +3,9 @@ name: Pipeline Cyberlab Backends
 # Deploiement des backends cyberlab (cyberlab/docker-compose.yml), separe du
 # pipeline de monitoring (monitoring.yml) : un changement de l'un ne redemarre
 # jamais l'autre. Ne se declenche que si les fichiers du cyberlab changent.
+# Les images des backends sont publiees et signees par la CI de chaque depot
+# (GHCR) ; une PR automatique y reporte le digest dans le compose. Ce pipeline
+# verifie les signatures (job ②, puis playbook) avant tout deploiement.
 on:
   push:
     branches: [main]
@@ -111,6 +114,26 @@ jobs:
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
             ghcr.io/aquasecurity/trivy:0.74.0@sha256:62b1e65e8869bc4b4c6aa4fa2b21595256c7c2f6018a9d9ad61caf87187c1969
+
+      # Gate anticipé : les signatures des backends sont vérifiées ici, avant le
+      # build et surtout avant la demande d'approbation "production". Les images
+      # sont lues dans le compose ; l'identité attendue (dépôt, workflow ci.yml
+      # sur main) est déduite du nom d'image. (?i) : le certificat garde la casse
+      # du compte GitHub, GHCR force les minuscules.
+      - name: Cosign — signature des images backends (GHCR)
+        run: |
+          IMAGES=$(grep -oE 'ghcr\.io/[^[:space:]@]+@sha256:[a-f0-9]{64}' \
+            "$WORKSPACE/cyberlab/docker-compose.yml" | sort -u)
+          [ -n "$IMAGES" ] || { echo "Aucune image GHCR trouvée dans le compose"; exit 1; }
+          for IMG in $IMAGES; do
+            REPO_PATH="${IMG%%@*}"
+            REPO_PATH="${REPO_PATH#ghcr.io/}"
+            echo "Vérification : $IMG"
+            docker run --rm "$COSIGN_IMAGE" verify \
+              --certificate-identity-regexp "(?i)^https://github.com/${REPO_PATH}/\.github/workflows/ci\.yml@refs/heads/main$" \
+              --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
+              "$IMG"
+          done
 
       - name: Gitleaks — détection de secrets
         run: |
