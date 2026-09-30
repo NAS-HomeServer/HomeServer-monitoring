@@ -39,7 +39,7 @@ services:
     user: 1000:1000
 
   cloudflared-sherlock:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
     container_name: cloudflared_sherlock
     command: tunnel run
     env_file:
@@ -65,7 +65,7 @@ services:
     memswap_limit: 512M
 
   cloudflared-dns:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
     container_name: cloudflared_dns_analyzer
     command: tunnel run
     env_file:
@@ -91,7 +91,7 @@ services:
     memswap_limit: 512M
 
   cloudflared-audit:
-    image: cloudflare/cloudflared:latest
+    image: cloudflare/cloudflared@sha256:072c067d25ccbe61d46e18f0d0723255f2bb5304f7317caa95b27031520ff92c
     container_name: cloudflared_audit_orchestrator
     command: tunnel run
     env_file:
