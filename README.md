@@ -29,7 +29,7 @@ Tous les services partagent le réseau bridge `homeserver-monitoring`. Blackbox 
 
 ### Via GitHub Actions (recommandé)
 
-Le workflow [`monitoring.yml`](.github/workflows/monitoring.yml) se déclenche à chaque push sur `main` (sauf s'il ne touche que les fichiers du cyberlab, qui ont leur propre workflow), ou manuellement depuis l'onglet **Actions**. Il enchaîne quatre jobs :
+Le workflow [`monitoring.yml`](.github/workflows/monitoring.yml) se déclenche à chaque push sur `main` , ou manuellement depuis l'onglet **Actions**. Il enchaîne quatre jobs :
 
 | Job | Contenu |
 |---|---|
@@ -61,7 +61,7 @@ Le playbook :
 
 Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
 
-Les backends cyberlab ne font pas partie de ce pipeline : voir [`cyberlab-backends.yml`](.github/workflows/cyberlab-backends.yml) dans la section [Cyberlab](#cyberlab).
+Les backends cyberlab ne font pas partie de ce pipeline : ils ont leur propre dépôt, [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends) (voir la section [Cyberlab](#cyberlab)).
 
 ### Via Docker Compose
 
@@ -129,11 +129,11 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 ### Cyberlab
 
-Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans [`cyberlab/docker-compose.yml`](cyberlab/docker-compose.yml) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
+Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans le dépôt [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends) (`cyberlab/docker-compose.yml`) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
 
-- **Réseau `cyberlab`** : créé par `cyberlab/docker-compose.yml` (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le workflow cyberlab doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
+- **Réseau `cyberlab`** : créé par le compose du dépôt Cyberlab_backends (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le pipeline de Cyberlab_backends doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
-- **Workflow dédié** : [`cyberlab-backends.yml`](.github/workflows/cyberlab-backends.yml) (4 jobs : lint, sécurité & gitleaks & Trivy config, build de l'image Ansible, puis déploiement via [`deploy-cyberlab.yml`](ansible/playbooks/deploy-cyberlab.yml)) se déclenche sur un push sur `main` qui modifie `cyberlab/**`, ou manuellement. Projet Compose séparé (`cyberlab`), workspace distinct (`workspace_cyberlab`, un sous-dossier par job) : un déploiement du monitoring ne redémarre jamais les backends, et inversement. Ansible ne recrée un conteneur que si sa définition change.
+- **CI/CD des backends** : pipeline (lint, sécurité, build, déploiement Ansible avec vérification Cosign) dans [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends). Projet Compose séparé (`cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement.
 
 **Cibles blackbox** ([`config/blackbox/blackbox.yml`](config/blackbox/blackbox.yml)) :
 
@@ -221,8 +221,6 @@ Un changement de provisioning ou de dashboard entraîne un redémarrage automati
 HomeServer-monitoring/
 ├── monitoring/
 │   └── docker-compose.yml              # Stack monitoring (Prometheus, Grafana, Alertmanager, exporters)
-├── cyberlab/
-│   └── docker-compose.yml              # Backends cyberlab (sherlock, dns_analyzer, audit_orchestrator + cloudflared)
 ├── config/
 │   ├── prometheus.yml                  # Scrape jobs, rule_files, alerting
 │   ├── blackbox/
@@ -239,14 +237,12 @@ HomeServer-monitoring/
 │   ├── inventory/
 │   │   └── hosts.ini                   # Inventaire (localhost)
 │   └── playbooks/
-│       ├── deploy-monitoring.yml       # Playbook du pipeline monitoring
-│       └── deploy-cyberlab.yml         # Playbook du workflow cyberlab
+│       └── deploy-monitoring.yml       # Playbook du pipeline monitoring
 ├── ci/
 │   └── Dockerfile.ansible-runner       # Image Ansible utilisée par la CI
 ├── .github/
 │   └── workflows/
-│       ├── monitoring.yml                # Pipeline CI/CD monitoring (lint, sécurité, build, deploy)
-│       └── cyberlab.yml                # Pipeline CI/CD des backends cyberlab (check, deploy)
+│       └── monitoring.yml              # Pipeline CI/CD monitoring (lint, sécurité, build, deploy)
 ├── renovate.json                       # Mises à jour automatiques des dépendances
 ├── .trivyignore                        # Risques Trivy acceptés
 └── .yamllint.yml                       # Règles yamllint
