@@ -90,7 +90,7 @@ services:
       - '--config.file=/etc/blackbox/blackbox.yml'
     # cyberlab : c'est blackbox_exporter (pas Prometheus) qui emet les requetes
     # de sonde, il doit donc resoudre dns_analyzer / audit_orchestrator par nom
-    # de conteneur. Reseau cree par le compose du depot Cyberlab_backends.
+    # de conteneur. Reseau cree par le compose du depot cyberlab-infra.
     networks:
       - monitoring
       - cyberlab
@@ -171,7 +171,7 @@ networks:
   monitoring:
     driver: bridge
     name: homeserver-monitoring
-  # Cree et possede par le compose du depot Cyberlab_backends : external ici pour que
+  # Cree et possede par le compose du depot cyberlab-infra : external ici pour que
   # le cycle de vie du monitoring (up/down) ne le cree ni ne le supprime.
   cyberlab:
     external: true

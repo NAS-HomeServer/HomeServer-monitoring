@@ -61,7 +61,7 @@ Le playbook :
 
 Le conteneur `ansible-runner` n'est pas raccordé au réseau `monitoring` : le rechargement HTTP passe donc par un `docker exec` dans le conteneur cible plutôt que par un appel réseau direct depuis Ansible.
 
-Les backends cyberlab ne font pas partie de ce pipeline : ils ont leur propre dépôt, [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends) (voir la section [Cyberlab](#cyberlab)).
+Les backends cyberlab ne font pas partie de ce pipeline : ils ont leur propre dépôt, [cyberlab-infra](https://github.com/NAS-HomeServer/cyberlab-infra) (voir la section [Cyberlab](#cyberlab)).
 
 ### Via Docker Compose
 
@@ -129,11 +129,11 @@ Route par défaut : `group_by: [alertname]`, `group_wait: 30s`, `group_interval:
 
 ### Cyberlab
 
-Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans le dépôt [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends) (`cyberlab/docker-compose.yml`) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
+Sondes et alertes du cyberlab (site, API, Workers Cloudflare, backends du NAS). Le compose des backends est versionné dans le dépôt [cyberlab-infra](https://github.com/NAS-HomeServer/cyberlab-infra) (`cyberlab/docker-compose.yml`) : sherlock, dns_analyzer, audit_orchestrator et leurs trois `cloudflared`.
 
-- **Réseau `cyberlab`** : créé par le compose du dépôt Cyberlab_backends (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le pipeline de Cyberlab_backends doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
+- **Réseau `cyberlab`** : créé par le compose du dépôt cyberlab-infra (nom fixe, propriétaire naturel des backends). Le compose monitoring le déclare en `external: true` et y attache blackbox_exporter (c'est lui qui émet les sondes, pas Prometheus), ce qui permet de sonder les backends par nom de conteneur ; un `down` du monitoring ne peut donc pas le supprimer. Conséquence : le pipeline de cyberlab-infra doit avoir tourné au moins une fois avant le premier déploiement du monitoring (le réseau doit exister).
 - **Secrets** : les `.env` (`sherlock/`, `dns_analyzer/`, `audit_orchestrator/`) référencés par `env_file` restent uniquement sur le NAS, sous `/volume2/docker/cyberlab/`, jamais versionnés. Les scripts `deploy-*.sh` du NAS (build/push/`compose up`) restent le moyen de mettre à jour les images applicatives.
-- **CI/CD des backends** : pipeline (lint, sécurité, build, déploiement Ansible avec vérification Cosign) dans [Cyberlab_backends](https://github.com/NAS-HomeServer/Cyberlab_backends). Projet Compose séparé (`cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement.
+- **CI/CD des backends** : pipeline (lint, sécurité, build, déploiement Ansible avec vérification Cosign) dans [cyberlab-infra](https://github.com/NAS-HomeServer/cyberlab-infra). Projet Compose séparé (`cyberlab`) : un déploiement du monitoring ne redémarre jamais les backends, et inversement.
 
 **Cibles blackbox** ([`config/blackbox/blackbox.yml`](config/blackbox/blackbox.yml)) :
 
