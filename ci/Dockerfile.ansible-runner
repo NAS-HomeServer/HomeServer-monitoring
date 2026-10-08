@@ -1,4 +1,4 @@
-FROM alpine/ansible:2.21.0@sha256:514964555c1132eb1948078a95ac6d50c21a49d540fca73176e66828e6ad19ac
+FROM alpine/ansible:2.21.0@sha256:4094c292efaef047ab9886374810446a4038d055e7b9bc78187d88272aa9dbb4
 RUN apk update && apk upgrade --no-cache && \
     apk add --no-cache docker-cli docker-cli-compose
 COPY . /app
