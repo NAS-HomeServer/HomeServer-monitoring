@@ -63,9 +63,12 @@ groups:
         annotations:
           summary: "RAM disponible du NAS sous 1 Gio depuis 10 min ({{$values.B.Value | humanize}} Gio)"
 
-      # 2. Swap activement utilisé (écritures vers le swap) - seuil 0,5 page/s: les pics isoles (~33 page/s max) ne comptent pas
+      # 2. Swap actif ET RAM basse. Seuil 0,5 page/s : les pics isoles (~33 page/s max) ne
+      # comptent pas. Filtre "and on() MemAvailable < 1,5 Gio" : un redemarrage de conteneur
+      # peut pousser des pages froides en swap alors que la RAM reste abondante (pas de pression).
+      # Sans serie (RAM >= 1,5 Gio) la requete est vide : noDataState OK, pas d'alerte.
       - uid: swap-active
-        title: Swap actif (pswpout > 0,5 page/s)
+        title: Swap actif et RAM basse (pswpout > 0,5 page/s, dispo < 1,5 Gio)
         condition: C
         data:
           - refId: A
@@ -74,7 +77,9 @@ groups:
             model:
               refId: A
               instant: true
-              expr: rate(node_vmstat_pswpout[5m])
+              expr: >-
+                rate(node_vmstat_pswpout[5m])
+                and on() (node_memory_MemAvailable_bytes < 1.5 * 1024 * 1024 * 1024)
           - refId: B
             datasourceUid: __expr__
             model:
@@ -91,12 +96,51 @@ groups:
               conditions:
                 - evaluator: {type: gt, params: [0.5]}
         for: 10m
-        noDataState: NoData
+        noDataState: OK
         execErrState: Error
         labels:
           severity: warning
         annotations:
-          summary: "Le NAS écrit activement dans le swap depuis 10 min (pression mémoire réelle)"
+          summary: "Le NAS écrit activement dans le swap depuis 10 min alors que la RAM disponible est sous 1,5 Gio (pression mémoire réelle)"
+
+      # 2b. Swap quasi plein ET RAM basse : plus de place pour absorber un pic, risque d'OOM.
+      # Un swap plein avec beaucoup de RAM disponible (pages froides) n'est pas dangereux : on
+      # ne le signale donc pas seul. Sans serie (swap > 100 Mo libres ou RAM >= 1 Gio) : pas d'alerte.
+      - uid: swap-saturated
+        title: Swap saturé et RAM basse
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: cfe5m371sd62of
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                node_memory_MemAvailable_bytes / 1024 / 1024 / 1024
+                and on() (node_memory_SwapFree_bytes < 100 * 1024 * 1024)
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [1]}
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Swap presque plein (< 100 Mo libres) et RAM disponible sous 1 Gio ({{ $values.B.Value | humanize }} Gio) : risque d'OOM kill"
 
       # 3. Conteneur proche de sa limite mémoire (uniquement ceux qui ont une limite)
       - uid: container-mem-near-limit
