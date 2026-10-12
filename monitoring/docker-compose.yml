@@ -6,6 +6,14 @@ x-security-strict: &security-strict
   cap_drop:
     - ALL
 
+# Rotation des logs Docker (évite que json-file grossisse sans limite).
+x-logging: &logging
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "3"
+
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
@@ -32,8 +40,8 @@ services:
       - '--web.external-url=${PROMETHEUS_EXTERNAL_URL:-http://localhost:9090}'
     networks:
       - monitoring
-    mem_limit: 512M
-    memswap_limit: 512M
+    mem_limit: 768M
+    memswap_limit: 768M
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:9090/-/healthy"]
       interval: 30s
@@ -135,7 +143,7 @@ services:
     container_name: grafana
     restart: unless-stopped
     user: "1026:100"
-    <<: *security-strict
+    <<: [*security-strict, *logging]
     ports:
       - "3001:3000"
     environment:
@@ -143,10 +151,14 @@ services:
       - GF_ANALYTICS_REPORTING_ENABLED=false
       - GF_ANALYTICS_CHECK_FOR_UPDATES=false
       - GF_ANALYTICS_CHECK_FOR_PLUGIN_UPDATES=false
-      - GF_ALERTING_ENABLED=false
-      - GF_UNIFIED_ALERTING_ENABLED=false
+      # Unified alerting : requis pour les règles provisionnées dans
+      # /volume2/docker/grafana/provisioning/alerting/
+      - GF_UNIFIED_ALERTING_ENABLED=true
+      # Webhook Discord injecté par Ansible (ne pas committer la valeur en clair).
+      # Lu par le provisioning via $__env{GRAFANA_DISCORD_WEBHOOK}.
+      - GRAFANA_DISCORD_WEBHOOK=${GRAFANA_DISCORD_WEBHOOK:-}
       - GOMAXPROCS=2
-      - GOMEMLIMIT=800MiB
+      - GOMEMLIMIT=400MiB
       - GF_SNAPSHOTS_ENABLED=false
       - GF_NEWS_NEWS_FEED_ENABLED=false
       - GF_PLUGINS_PLUGIN_ADMIN_ENABLED=false
@@ -158,8 +170,8 @@ services:
       - prometheus
     networks:
       - monitoring
-    mem_limit: 1G
-    memswap_limit: 1G
+    mem_limit: 512M
+    memswap_limit: 512M
     healthcheck:
       test: ["CMD", "wget", "-q", "--spider", "http://localhost:3000/api/health"]
       interval: 30s

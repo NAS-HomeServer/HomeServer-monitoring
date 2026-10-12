@@ -32,6 +32,7 @@
       with_items:
         - 'provisioning/datasources'
         - 'provisioning/dashboards'
+        - 'provisioning/alerting'
         - 'dashboards/nas'
         - 'dashboards/cyberlab'
 
@@ -164,6 +165,18 @@
         mode: '0644'
       notify: Redemarrer Grafana
 
+    # Le secret Discord n'est pas dans ce fichier : il est lu par Grafana via
+    # $__env{GRAFANA_DISCORD_WEBHOOK} (variable d'environnement du conteneur,
+    # cf. tache "Gestion de la Stack Docker Compose"). Le volume est monte en :ro.
+    - name: "Deploiement du provisioning Grafana (alerting)"
+      ansible.builtin.copy:
+        src: "{{ repo_root }}/config/grafana/provisioning/alerting/"
+        dest: /volume2/docker/grafana/provisioning/alerting/
+        owner: "1026"
+        group: "100"
+        mode: '0644'
+      notify: Redemarrer Grafana
+
     - name: "Deploiement des dashboards Grafana"
       ansible.builtin.copy:
         src: "{{ repo_root }}/config/grafana/dashboards/"
@@ -190,6 +203,9 @@
         DOCKER_API_VERSION: "1.43"
         # Interpole dans docker-compose.yml (--web.external-url de Prometheus).
         PROMETHEUS_EXTERNAL_URL: "{{ prometheus_external_url | default('http://localhost:9090', true) }}"
+        # Meme secret que Alertmanager (extra-var discord_webhook_url, issue du
+        # secret GitHub DISCORD_WEBHOOK_URL) : jamais ecrit dans Git.
+        GRAFANA_DISCORD_WEBHOOK: "{{ discord_webhook_url }}"
 
   handlers:
     # ansible.builtin.command plutot que community.docker.docker_container_exec/
