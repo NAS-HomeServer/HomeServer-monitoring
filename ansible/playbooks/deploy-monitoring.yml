@@ -38,7 +38,7 @@
         - 'provisioning/datasources'
         - 'provisioning/dashboards'
         - 'provisioning/alerting'
-        - 'dashboards/nas'
+        - 'dashboards/Synology DS1525+'
         - 'dashboards/cyberlab'
 
     - name: "Creation du repertoire de configuration blackbox_exporter"
@@ -223,6 +223,15 @@
             fi
       register: swappiness_result
       changed_when: "'CHANGED' in swappiness_result.stdout"
+
+    # copy n'efface rien : l'ancien dossier "nas" (dashboard Memoire NAS deplace
+    # dans "Synology DS1525+") definirait le meme uid deux fois et Grafana
+    # refuserait le provisioning. Supprime avant le redemarrage de Grafana.
+    - name: "Suppression de l'ancien dossier de dashboards nas"
+      ansible.builtin.file:
+        path: /volume2/docker/grafana/dashboards/nas
+        state: absent
+      notify: Redemarrer Grafana
 
     - name: "Nettoyage des conteneurs fantomes"
       # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
