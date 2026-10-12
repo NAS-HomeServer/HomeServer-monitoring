@@ -21,8 +21,8 @@
   "customManagers": [
     {
       "customType": "regex",
-      "description": "Images pinnees par digest dans les workflows GitHub Actions (docker run inline)",
-      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$"],
+      "description": "Images pinnees par digest dans les workflows GitHub Actions (docker run inline) et playbooks Ansible",
+      "fileMatch": ["^\\.github/workflows/.*\\.ya?ml$", "^ansible/playbooks/.*\\.ya?ml$"],
       "matchStrings": [
         "(?<depName>[a-zA-Z0-9./_-]+):(?<currentValue>[a-zA-Z0-9._-]+)@(?<currentDigest>sha256:[a-f0-9]{64})"
       ],

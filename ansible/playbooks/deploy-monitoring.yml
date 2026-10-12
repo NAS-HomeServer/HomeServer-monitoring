@@ -6,6 +6,11 @@
     compose_project_dir: "/app/monitoring"  # dossier contenant docker-compose.yml
     compose_project_name: "homeserver-monitoring"
     repo_root: "{{ playbook_dir }}/../.."
+    # vm.swappiness cible (defaut noyau/DSM : 60). Bas = le noyau prefere
+    # liberer du cache plutot que pousser des pages en swap.
+    vm_swappiness: 10
+    # Meme image (et meme digest) que ALPINE_IMAGE dans le workflow.
+    sysctl_image: alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6
 
   tasks:
     - name: "Creation des repertoires pour Prometheus"
@@ -185,6 +190,39 @@
         group: "100"
         mode: '0644'
       notify: Redemarrer Grafana
+
+    # Le conteneur ansible-runner ne peut ecrire ni /proc/sys ni /etc de l'hote :
+    # on passe par un conteneur ephemere privilegie via le socket Docker (vm.* n'est
+    # pas namespace, la valeur s'applique donc a l'hote). /etc/sysctl.conf est monte
+    # en fichier (cat > en place : sed -i echouerait sur un bind mount) pour que la
+    # valeur survive au reboot. "CHANGED" sur stdout pilote changed_when (idempotent).
+    - name: "Reglage vm.swappiness de l'hote (a chaud + persistant)"
+      ansible.builtin.command:
+        argv:
+          - docker
+          - run
+          - --rm
+          - --privileged
+          - -v
+          - /etc/sysctl.conf:/host_sysctl.conf
+          - "{{ sysctl_image }}"
+          - sh
+          - -c
+          - |
+            set -eu
+            want={{ vm_swappiness }}
+            if [ "$(sysctl -n vm.swappiness)" != "$want" ]; then
+              sysctl -w vm.swappiness="$want" >/dev/null
+              echo CHANGED
+            fi
+            if ! grep -qx "vm.swappiness = $want" /host_sysctl.conf \
+               || [ "$(grep -c '^vm.swappiness' /host_sysctl.conf)" -ne 1 ]; then
+              { grep -v '^vm.swappiness' /host_sysctl.conf; echo "vm.swappiness = $want"; } > /tmp/sysctl.new
+              cat /tmp/sysctl.new > /host_sysctl.conf
+              echo CHANGED
+            fi
+      register: swappiness_result
+      changed_when: "'CHANGED' in swappiness_result.stdout"
 
     - name: "Nettoyage des conteneurs fantomes"
       # Filtre sur le projet : sans lui, prune supprime TOUS les conteneurs arretes du NAS
