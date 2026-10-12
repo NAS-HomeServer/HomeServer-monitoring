@@ -77,7 +77,7 @@ jobs:
       - name: yamllint
         run: |
           docker run --rm -v "$WORKSPACE":/workspace \
-            pipelinecomponents/yamllint:0.35.13@sha256:5ab5eb7da0ed5e606b07c1723fc8b275e925189f70ac259b26b7329cb5f8f44d \
+            pipelinecomponents/yamllint:0.35.27@sha256:f7f7b4f8824839e33690a880dbe20944128b0dc9c55522a0b92a29b3a905cecf \
             yamllint -c /workspace/.yamllint.yml /workspace --strict
 
       - name: hadolint (Dockerfile lint)
