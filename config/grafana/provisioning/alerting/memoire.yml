@@ -1,0 +1,173 @@
+# Deploye par ansible/playbooks/deploy-monitoring.yml vers /volume2/docker/grafana/provisioning/alerting/memoire.yml
+# Prérequis : GF_UNIFIED_ALERTING_ENABLED=true et variable GRAFANA_DISCORD_WEBHOOK (voir compose).
+# Datasource : datasourceUid = uid du datasource provisionne dans
+# config/grafana/provisioning/datasources/prometheus.yml.
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: discord-homelab
+    receivers:
+      - uid: discord-homelab
+        type: discord
+        settings:
+          url: $__env{GRAFANA_DISCORD_WEBHOOK}
+          use_discord_username: false
+
+policies:
+  - orgId: 1
+    receiver: discord-homelab
+    group_by: ["alertname"]
+    group_wait: 30s
+    group_interval: 5m
+    repeat_interval: 6h
+
+groups:
+  - orgId: 1
+    name: memoire-nas
+    folder: Homelab
+    interval: 1m
+    rules:
+      # 1. RAM disponible faible (valeur actuelle observée : ~1,3 Gio)
+      - uid: mem-available-low
+        title: RAM disponible < 1 Gio
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: cfe5m371sd62of
+            model:
+              refId: A
+              instant: true
+              expr: node_memory_MemAvailable_bytes / 1024 / 1024 / 1024
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: lt, params: [1]}
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "RAM disponible du NAS sous 1 Gio depuis 10 min ({{$values.B.Value | humanize}} Gio)"
+
+      # 2. Swap activement utilisé (écritures vers le swap)
+      - uid: swap-active
+        title: Swap actif (pswpout > 0)
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: cfe5m371sd62of
+            model:
+              refId: A
+              instant: true
+              expr: rate(node_vmstat_pswpout[5m])
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        for: 10m
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "Le NAS écrit activement dans le swap depuis 10 min (pression mémoire réelle)"
+
+      # 3. Conteneur proche de sa limite mémoire (uniquement ceux qui ont une limite)
+      - uid: container-mem-near-limit
+        title: Conteneur > 90 % de sa limite mémoire
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 600, to: 0}
+            datasourceUid: cfe5m371sd62of
+            model:
+              refId: A
+              instant: true
+              expr: >-
+                max by (name) (
+                  container_memory_working_set_bytes{name!=""}
+                  / (container_spec_memory_limit_bytes{name!=""} > 0)
+                ) * 100
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [90]}
+        for: 10m
+        noDataState: OK
+        execErrState: Error
+        labels:
+          severity: warning
+        annotations:
+          summary: "{{$labels.name}} utilise {{$values.B.Value | humanize}} % de sa limite mémoire"
+
+      # 4. OOM kill détecté (hôte)
+      - uid: oom-kill-detected
+        title: OOM kill détecté
+        condition: C
+        data:
+          - refId: A
+            relativeTimeRange: {from: 900, to: 0}
+            datasourceUid: cfe5m371sd62of
+            model:
+              refId: A
+              instant: true
+              expr: increase(node_vmstat_oom_kill[10m])
+          - refId: B
+            datasourceUid: __expr__
+            model:
+              refId: B
+              type: reduce
+              expression: A
+              reducer: last
+          - refId: C
+            datasourceUid: __expr__
+            model:
+              refId: C
+              type: threshold
+              expression: B
+              conditions:
+                - evaluator: {type: gt, params: [0]}
+        for: 0s
+        noDataState: NoData
+        execErrState: Error
+        labels:
+          severity: critical
+        annotations:
+          summary: "Le noyau a tué un processus (OOM) ces 10 dernières minutes. Vérifier : docker ps -a, dmesg | grep -i oom"
