@@ -63,9 +63,9 @@ groups:
         annotations:
           summary: "RAM disponible du NAS sous 1 Gio depuis 10 min ({{$values.B.Value | humanize}} Gio)"
 
-      # 2. Swap activement utilisé (écritures vers le swap)
+      # 2. Swap activement utilisé (écritures vers le swap) - seuil 0,5 page/s: les pics isoles (~33 page/s max) ne comptent pas
       - uid: swap-active
-        title: Swap actif (pswpout > 0)
+        title: Swap actif (pswpout > 0,5 page/s)
         condition: C
         data:
           - refId: A
@@ -89,7 +89,7 @@ groups:
               type: threshold
               expression: B
               conditions:
-                - evaluator: {type: gt, params: [0]}
+                - evaluator: {type: gt, params: [0.5]}
         for: 10m
         noDataState: NoData
         execErrState: Error
