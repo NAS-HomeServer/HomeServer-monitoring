@@ -174,7 +174,7 @@ Fuseau `Europe/Paris`, télémétrie et vérifications de mises à jour désacti
 
 Datasource et dashboards sont provisionnés depuis git ([`config/grafana/provisioning/`](config/grafana/provisioning/)), en lecture seule dans le conteneur :
 - **Datasource** Prometheus (`prometheus`, uid `cfe5m371sd62of`, `http://prometheus:9090`) — nom et uid identiques à la datasource existante, pour ne pas casser les dashboards déjà en place
-- **Dashboards** ([`config/grafana/dashboards/`](config/grafana/dashboards/)) organisés en dossiers (`foldersFromFilesStructure: true`) : `nas/` (vide pour l'instant) et `cyberlab/` (dashboard [Cyberlab](#dashboard-cyberlab))
+- **Dashboards** ([`config/grafana/dashboards/`](config/grafana/dashboards/)) organisés en dossiers (`foldersFromFilesStructure: true`) : `Synology DS1525+/` (dashboard Mémoire NAS, uid `nas-memoire`) et `cyberlab/` (dashboard [Cyberlab](#dashboard-cyberlab))
 - Provisioning non modifiable depuis l'UI (`editable: false`, `allowUiUpdates: false`) : toute évolution passe par git
 
 #### Dashboard Cyberlab
