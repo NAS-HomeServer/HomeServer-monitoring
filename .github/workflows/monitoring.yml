@@ -150,7 +150,7 @@ jobs:
           docker run --rm "$COSIGN_IMAGE" verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+            ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222
 
       # --redact : évite qu'une valeur de secret détectée soit imprimée en
       # clair dans le log du job (persistant sur GitHub Actions) — sinon
@@ -185,7 +185,7 @@ jobs:
           CID="trivy-iac-${{ github.run_id }}-${{ github.run_attempt }}"
           docker run --name "$CID" \
             -v "$WORKSPACE":/workspace \
-            ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa config \
+            ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 config \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
             --ignorefile /workspace/.trivyignore \
@@ -284,7 +284,7 @@ jobs:
           docker run --rm "$COSIGN_IMAGE" verify \
             --certificate-identity-regexp "https://github.com/aquasecurity/trivy" \
             --certificate-oidc-issuer "https://token.actions.githubusercontent.com" \
-            ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa
+            ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222
 
       - name: Build image Ansible
         run: |
@@ -301,7 +301,7 @@ jobs:
           CID="trivy-image-${{ github.run_id }}-${{ github.run_attempt }}"
           docker run --name "$CID" \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+            ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
             image \
             --exit-code 1 \
             --severity HIGH,CRITICAL \
@@ -357,7 +357,7 @@ jobs:
         run: |
           docker run --rm \
             -v /var/run/docker.sock:/var/run/docker.sock \
-            ghcr.io/aquasecurity/trivy:0.75.0@sha256:af6acf9a6b85dfe389a1941505c0ce9efef52a4719635e1a962f022a3d855daa \
+            ghcr.io/aquasecurity/trivy:0.76.0@sha256:2416d1f74045b57274df1a340eee6b510cacd73c66a6ccb8da092b117eb7d222 \
             image --format cyclonedx ansible-runner:${{ github.sha }} \
             > "$WORKSPACE/sbom.cdx.json"
 
