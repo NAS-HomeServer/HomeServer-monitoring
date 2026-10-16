@@ -154,6 +154,8 @@ services:
       # Unified alerting : requis pour les règles provisionnées dans
       # /volume2/docker/grafana/provisioning/alerting/
       - GF_UNIFIED_ALERTING_ENABLED=true
+      # URL publique : utilisée pour les liens Source/Silence des alertes Discord
+      - GF_SERVER_ROOT_URL=https://grafana.homeservers.synology.me/
       # Webhook Discord injecté par Ansible (ne pas committer la valeur en clair).
       # Lu par le provisioning via $__env{GRAFANA_DISCORD_WEBHOOK}.
       - GRAFANA_DISCORD_WEBHOOK=${GRAFANA_DISCORD_WEBHOOK:-}
