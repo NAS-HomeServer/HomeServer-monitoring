@@ -17,7 +17,7 @@ x-logging: &logging
 services:
   # --- BLOC PROMETHEUS ---
   prometheus:
-    image: prom/prometheus:v3.15.0
+    image: prom/prometheus:v3.15.1
     container_name: prometheus
     user: "1026:100"
     <<: *security-strict
