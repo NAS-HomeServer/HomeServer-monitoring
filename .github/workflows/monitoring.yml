@@ -18,7 +18,7 @@ env:
   RUNNER_DOCKERFILE: ci/Dockerfile.ansible-runner
   TARBALL_URL: https://api.github.com/repos/${{ github.repository }}/tarball/${{ github.sha }}
   COSIGN_IMAGE: gcr.io/projectsigstore/cosign@sha256:9e5c2f2edc34351160407ca3416c61855bdf9403c3c5936e0f0be7fc261611b8
-  ALPINE_IMAGE: alpine:3.24@sha256:c6b073f8e9e58d881f6ffba6ebf3b9ebd60b9e7d6e8337018c0e68bb5c356873
+  ALPINE_IMAGE: alpine:3.24@sha256:be2656061b536c1883c4034790e21d0a09c5aaaf51968b89368a3c0371ea2c9a
   # Memes versions que monitoring/docker-compose.yml, pour valider la config avec le
   # meme binaire promtool/amtool que celui qui la chargera en production.
   PROMETHEUS_IMAGE: prom/prometheus:v3.15.1@sha256:fa3302279710be2f21a8301ec17a8b4f2301fd829bd113839b3b6b02b6f191a2
