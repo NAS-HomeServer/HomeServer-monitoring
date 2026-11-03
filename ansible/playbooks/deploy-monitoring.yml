@@ -1,6 +1,6 @@
 ---
 - name: "IaC - Deploiement Stack Monitoring (Prometheus / Grafana / Alertmanager / cAdvisor / blackbox)"
-  hosts: localhost
+  hosts: nas_monitoring
   connection: local
   vars:
     compose_project_dir: "/app/monitoring"  # dossier contenant docker-compose.yml
