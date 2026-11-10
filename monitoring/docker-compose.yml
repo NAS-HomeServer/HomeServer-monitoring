@@ -113,7 +113,7 @@ services:
 
   # --- BLOC ALERTING ---
   alertmanager:
-    image: prom/alertmanager:v0.34.2
+    image: prom/alertmanager:v0.35.0
     container_name: alertmanager
     <<: *security-strict
     read_only: true
