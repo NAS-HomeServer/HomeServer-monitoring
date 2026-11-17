@@ -35,6 +35,7 @@ services:
       - '--storage.tsdb.retention.time=30d'
       - '--storage.tsdb.retention.size=2GB'
       - '--web.enable-lifecycle'
+      - '--web.enable-remote-write-receiver'
       # Base des liens "Source" des alertes Discord ; sans ce flag Prometheus
       # met l'id du conteneur (injoignable). Valeur passee par Ansible.
       - '--web.external-url=${PROMETHEUS_EXTERNAL_URL:-http://localhost:9090}'
