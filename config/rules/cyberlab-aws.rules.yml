@@ -1,0 +1,77 @@
+# Regles d'alerte du cyberlab sur AWS, evaluees par le Prometheus du NAS (qui recoit les
+# metriques de l'agent par remote_write). A copier dans config/rules/ du depot
+# HomeServer-monitoring : voir docs/changements-nas-monitoring.md.
+#
+# Chaque regle est bornee a cluster="aws-k3s" : elle ne peut pas se declencher sur les series
+# du NAS, et les regles existantes (cyberlab.yml) ne voient pas celles d'AWS (jobs "aws-*").
+# Pas d'alerte "metriques absentes" : l'instance est arretee chaque soir, elle sonnerait tous
+# les jours. Un arret volontaire n'est pas une panne.
+groups:
+  - name: cyberlab-aws
+    rules:
+      # kube-state-metrics : replicas disponibles d'un deployment (backends ET tunnels).
+      # Couper un backend (kubectl scale --replicas=0) declenche cette alerte : c'est la demo.
+      - alert: AwsProductionWorkloadDown
+        expr: kube_deployment_status_replicas_available{cluster="aws-k3s", namespace="cyberlab-production"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          service: cyberlab
+        annotations:
+          summary: "AWS production : {{ $labels.deployment }} indisponible"
+          description: "Plus aucun replica disponible pour {{ $labels.deployment }} (namespace {{ $labels.namespace }}) depuis 2 minutes."
+
+      - alert: AwsStagingWorkloadDown
+        expr: kube_deployment_status_replicas_available{cluster="aws-k3s", namespace="cyberlab-staging"} == 0
+        for: 5m
+        labels:
+          severity: warning
+          service: cyberlab
+        annotations:
+          summary: "AWS staging : {{ $labels.deployment }} indisponible"
+          description: "Plus aucun replica disponible pour {{ $labels.deployment }} (namespace {{ $labels.namespace }}) depuis 5 minutes."
+
+      # Un tunnel sans connexion vers Cloudflare : le site n'est plus joignable pour cet environnement.
+      - alert: AwsTunnelNoConnection
+        expr: cloudflared_tunnel_ha_connections{cluster="aws-k3s"} == 0
+        for: 3m
+        labels:
+          severity: critical
+          service: cyberlab
+        annotations:
+          summary: "AWS : tunnel {{ $labels.tunnel }} sans connexion Cloudflare ({{ $labels.env }})"
+          description: "Le tunnel {{ $labels.tunnel }} n'a plus aucune connexion active vers Cloudflare depuis 3 minutes."
+
+      - alert: AwsPodRestarting
+        expr: increase(kube_pod_container_status_restarts_total{cluster="aws-k3s", namespace=~"cyberlab-.*"}[15m]) > 3
+        labels:
+          severity: warning
+          service: cyberlab
+        annotations:
+          summary: "AWS : {{ $labels.pod }} redemarre en boucle ({{ $labels.env }})"
+          description: "Le conteneur {{ $labels.container }} de {{ $labels.pod }} a redemarre {{ $value | humanize }} fois en 15 minutes."
+
+      # Le filtre "> 0" exclut les conteneurs sans limite memoire (limite 0 : division par zero).
+      - alert: AwsContainerHighMemory
+        expr: |
+          container_memory_working_set_bytes{cluster="aws-k3s", namespace=~"cyberlab-.*"}
+          / on (namespace, pod, container) group_left (env, cluster)
+          (container_spec_memory_limit_bytes{cluster="aws-k3s", namespace=~"cyberlab-.*"} > 0)
+          > 0.85
+        for: 5m
+        labels:
+          severity: warning
+          service: cyberlab
+        annotations:
+          summary: "AWS : memoire elevee sur {{ $labels.pod }} ({{ $labels.env }})"
+          description: "{{ $labels.container }} utilise {{ $value | humanizePercentage }} de sa limite memoire (seuil 85 %) depuis 5 minutes."
+
+      - alert: AwsNodeLowMemory
+        expr: node_memory_MemAvailable_bytes{cluster="aws-k3s"} / node_memory_MemTotal_bytes{cluster="aws-k3s"} < 0.10
+        for: 10m
+        labels:
+          severity: warning
+          service: cyberlab
+        annotations:
+          summary: "AWS : memoire de l'instance presque epuisee"
+          description: "Moins de 10 % de memoire disponible sur le noeud K3s depuis 10 minutes (passer a une instance plus grande ?)."
