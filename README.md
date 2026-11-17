@@ -190,6 +190,19 @@ Datasource et dashboards sont provisionnés depuis git ([`config/grafana/provisi
 
 Variables : `Instance` (multi-select, filtre les panels de sondes) et `Conteneur` (multi-select, liste fixe des 6 conteneurs du compose cyberlab, filtre CPU, mémoire et état). Les stats de la vue d'ensemble ne sont jamais filtrées.
 
+#### Dashboard Cyberlab AWS - Pods
+
+[`config/grafana/dashboards/cyberlab/aws-pods.json`](config/grafana/dashboards/cyberlab/aws-pods.json) (dossier Grafana `cyberlab`, uid `cyberlab-aws-pods`, refresh 1 min). Il lit les métriques du cluster k3s AWS, envoyées par `remote_write` par le Prometheus Agent du repo `cyberlab-aws` (label `cluster="aws-k3s"`). Il n'ajoute aucune instrumentation.
+
+| Row | Panels |
+|---|---|
+| Vue d'ensemble | Pods Running, Pending, Failed, non prêts, redémarrages sur 1 h, deployments dégradés |
+| Pods et deployments | Pods par phase, replicas disponibles vs désirés, redémarrages par pod, dernière cause d'arrêt (OOMKilled, Error...) |
+| Ressources par pod | CPU, mémoire vs limite, réseau reçu et émis (cAdvisor) |
+| Nœud | Pods et conteneurs du kubelet, conditions du nœud |
+
+Variable : `Namespace` (multi-select). Si aucune donnée n'apparaît, vérifier que `cluster="aws-k3s"` existe dans Prometheus et que l'agent AWS écrit bien vers le récepteur `remote_write`.
+
 Les dashboards provisionnés sont en lecture seule dans l'UI (`editable: false`, `allowUiUpdates: false`, `disableDeletion: true`) : on modifie le fichier JSON, via git, jamais l'interface (cohérent avec l'IaC ; une modification faite dans l'UI ne pourrait de toute façon pas être enregistrée).
 
 **Limites**
