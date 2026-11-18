@@ -462,13 +462,281 @@
       }
     },
     {
+      "id": 21,
+      "type": "row",
+      "title": "Liste des pods",
+      "collapsed": false,
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 24,
+        "h": 1
+      },
+      "panels": []
+    },
+    {
+      "id": 22,
+      "type": "table",
+      "title": "Liste des pods",
+      "description": "Un pod par ligne : namespace, phase, prêt ou non, redémarrages.",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "cfe5m371sd62of"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 6,
+        "w": 24,
+        "h": 10
+      },
+      "targets": [
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cfe5m371sd62of"
+          },
+          "expr": "max by (namespace, pod, phase) (kube_pod_status_phase{cluster=\"aws-k3s\", namespace=~\"$namespace\"} == 1)",
+          "refId": "A",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cfe5m371sd62of"
+          },
+          "expr": "max by (namespace, pod) (kube_pod_status_ready{cluster=\"aws-k3s\", namespace=~\"$namespace\", condition=\"true\"})",
+          "refId": "B",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        },
+        {
+          "datasource": {
+            "type": "prometheus",
+            "uid": "cfe5m371sd62of"
+          },
+          "expr": "sum by (namespace, pod) (kube_pod_container_status_restarts_total{cluster=\"aws-k3s\", namespace=~\"$namespace\"})",
+          "refId": "C",
+          "format": "table",
+          "instant": true,
+          "range": false,
+          "editorMode": "code"
+        }
+      ],
+      "transformations": [
+        {
+          "id": "joinByField",
+          "options": {
+            "byField": "pod",
+            "mode": "outer"
+          }
+        },
+        {
+          "id": "organize",
+          "options": {
+            "excludeByName": {
+              "Time": true,
+              "Time 1": true,
+              "Time 2": true,
+              "Time 3": true,
+              "namespace 2": true,
+              "namespace 3": true,
+              "Value #A": true
+            },
+            "renameByName": {
+              "namespace": "Namespace",
+              "namespace 1": "Namespace",
+              "pod": "Pod",
+              "phase": "Phase",
+              "Value #B": "Prêt",
+              "Value #C": "Redémarrages"
+            },
+            "indexByName": {
+              "Namespace": 0,
+              "Pod": 1,
+              "Phase": 2,
+              "Prêt": 3,
+              "Redémarrages": 4
+            }
+          }
+        },
+        {
+          "id": "sortBy",
+          "options": {
+            "sort": [
+              {
+                "field": "Namespace"
+              },
+              {
+                "field": "Pod"
+              }
+            ]
+          }
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "align": "auto",
+            "cellOptions": {
+              "type": "auto"
+            },
+            "filterable": true
+          }
+        },
+        "overrides": [
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Phase"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "Running": {
+                        "text": "Running",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "Pending": {
+                        "text": "Pending",
+                        "color": "orange",
+                        "index": 1
+                      },
+                      "Failed": {
+                        "text": "Failed",
+                        "color": "red",
+                        "index": 2
+                      },
+                      "Succeeded": {
+                        "text": "Succeeded",
+                        "color": "blue",
+                        "index": 3
+                      },
+                      "Unknown": {
+                        "text": "Unknown",
+                        "color": "red",
+                        "index": 4
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Prêt"
+            },
+            "properties": [
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-background"
+                }
+              },
+              {
+                "id": "mappings",
+                "value": [
+                  {
+                    "type": "value",
+                    "options": {
+                      "1": {
+                        "text": "Oui",
+                        "color": "green",
+                        "index": 0
+                      },
+                      "0": {
+                        "text": "Non",
+                        "color": "red",
+                        "index": 1
+                      }
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "matcher": {
+              "id": "byName",
+              "options": "Redémarrages"
+            },
+            "properties": [
+              {
+                "id": "decimals",
+                "value": 0
+              },
+              {
+                "id": "custom.cellOptions",
+                "value": {
+                  "type": "color-text"
+                }
+              },
+              {
+                "id": "color",
+                "value": {
+                  "mode": "thresholds"
+                }
+              },
+              {
+                "id": "thresholds",
+                "value": {
+                  "mode": "absolute",
+                  "steps": [
+                    {
+                      "color": "green",
+                      "value": null
+                    },
+                    {
+                      "color": "orange",
+                      "value": 1
+                    },
+                    {
+                      "color": "red",
+                      "value": 5
+                    }
+                  ]
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "options": {
+        "showHeader": true,
+        "cellHeight": "sm",
+        "sortBy": [
+          {
+            "displayName": "Namespace",
+            "desc": false
+          }
+        ]
+      }
+    },
+    {
       "id": 8,
       "type": "row",
       "title": "Pods et deployments",
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 5,
+        "y": 16,
         "w": 24,
         "h": 1
       },
@@ -485,7 +753,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 6,
+        "y": 17,
         "w": 12,
         "h": 8
       },
@@ -548,7 +816,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 6,
+        "y": 17,
         "w": 12,
         "h": 8
       },
@@ -623,7 +891,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 14,
+        "y": 25,
         "w": 12,
         "h": 8
       },
@@ -687,7 +955,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 14,
+        "y": 25,
         "w": 12,
         "h": 8
       },
@@ -746,7 +1014,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 22,
+        "y": 33,
         "w": 24,
         "h": 1
       },
@@ -763,7 +1031,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 23,
+        "y": 34,
         "w": 12,
         "h": 8
       },
@@ -827,7 +1095,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 23,
+        "y": 34,
         "w": 12,
         "h": 8
       },
@@ -903,7 +1171,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 31,
+        "y": 42,
         "w": 12,
         "h": 8
       },
@@ -967,7 +1235,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 31,
+        "y": 42,
         "w": 12,
         "h": 8
       },
@@ -1027,7 +1295,7 @@
       "collapsed": false,
       "gridPos": {
         "x": 0,
-        "y": 39,
+        "y": 50,
         "w": 24,
         "h": 1
       },
@@ -1044,7 +1312,7 @@
       },
       "gridPos": {
         "x": 0,
-        "y": 40,
+        "y": 51,
         "w": 12,
         "h": 8
       },
@@ -1119,7 +1387,7 @@
       },
       "gridPos": {
         "x": 12,
-        "y": 40,
+        "y": 51,
         "w": 12,
         "h": 8
       },
